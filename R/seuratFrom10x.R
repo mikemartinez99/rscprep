@@ -69,36 +69,48 @@ seuratFrom10x <- function(manifest = NULL, path = NULL, multiplexed = NULL,
                            min.cells = 10, min.features = 50) {
 
     if (is.null(manifest) && is.null(path)) {
-        stop("Provide either 'manifest' or 'path'.")
+        cli::cli_abort("Provide either {.arg manifest} or {.arg path}.")
     }
     if (!is.null(manifest) && !is.null(path)) {
-        stop("Provide only one of 'manifest' or 'path', not both.")
+        cli::cli_abort("Provide only one of {.arg manifest} or {.arg path}, not both.")
     }
     if (!is.null(path) && is.null(multiplexed)) {
-        stop("When using 'path', you must also specify 'multiplexed' (TRUE/FALSE).")
+        cli::cli_abort(
+            "When using {.arg path}, you must also specify {.arg multiplexed} ({.val {TRUE}}/{.val {FALSE}})."
+        )
     }
+
+    # A missing H5 is fatal in path mode -- there is no other sample to fall
+    # back on -- so the injected handler aborts instead of warning.
+    fatal <- function(msg) cli::cli_abort("{msg}", call = NULL)
 
     if (!is.null(path)) {
         path <- sub("/+$", "", path)
         if (multiplexed) {
-            return(readMultiplexedRun10x(path, min.cells, min.features,
-                                          on_missing = function(m) stop(m, call. = FALSE)))
+            seurat_list <- readMultiplexedRun10x(path, min.cells, min.features,
+                                                  on_missing = fatal)
+        } else {
+            ident <- basename(dirname(path))
+            seurat <- readOneSample10x(path, ident, min.cells, min.features,
+                                        on_missing = fatal)
+            seurat_list <- setNames(list(seurat), ident)
         }
-        ident <- basename(dirname(path))
-        seurat <- readOneSample10x(path, ident, min.cells, min.features,
-                                    on_missing = function(m) stop(m, call. = FALSE))
-        return(setNames(list(seurat), ident))
+        cli::cli_alert_success("Loaded {length(seurat_list)} sample{?s}.")
+        return(seurat_list)
     }
 
     required_cols <- c("Path", "multiplexed")
     missing_cols <- setdiff(required_cols, colnames(manifest))
     if (length(missing_cols) > 0) {
-        stop(sprintf("manifest is missing required column(s): %s",
-                      paste(missing_cols, collapse = ", ")))
+        cli::cli_abort(
+            "{.arg manifest} is missing required column{?s}: {.field {missing_cols}}"
+        )
     }
-    if (nrow(manifest) == 0) stop("manifest has no rows.")
+    if (nrow(manifest) == 0) cli::cli_abort("{.arg manifest} has no rows.")
     if (!is.logical(manifest$multiplexed)) {
-        stop("manifest$multiplexed must be logical (TRUE/FALSE).")
+        cli::cli_abort(
+            "{.field manifest$multiplexed} must be logical ({.val {TRUE}}/{.val {FALSE}})."
+        )
     }
 
     seurat_list <- lapply(seq_len(nrow(manifest)), function(row_i) {
@@ -112,5 +124,12 @@ seuratFrom10x <- function(manifest = NULL, path = NULL, multiplexed = NULL,
     })
 
     seurat_list <- unlist(seurat_list, recursive = FALSE)
-    seurat_list[!sapply(seurat_list, is.null)]
+    seurat_list <- seurat_list[!sapply(seurat_list, is.null)]
+
+    n_rows <- nrow(manifest)
+    cli::cli_alert_success(
+        "Loaded {length(seurat_list)} sample{?s} from {n_rows} manifest row{?s}."
+    )
+
+    seurat_list
 }
