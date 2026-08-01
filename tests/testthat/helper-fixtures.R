@@ -167,6 +167,29 @@ make_empty_seurat <- function(ident = "Sample_Empty", n_genes = 20) {
     obj
 }
 
+#' Build a sample-level metadata sheet.
+#'
+#' `key = "column"` puts sample names in a `Sample` column (how a CSV round
+#' trips); `key = "rownames"` puts them in the rownames. `...` supplies the
+#' metadata columns, recycled to one value per sample.
+make_sample_sheet <- function(idents = c("Sample_A", "Sample_B"),
+                              key = c("column", "rownames"), ...) {
+    key  <- match.arg(key)
+    cols <- list(...)
+    if (length(cols) == 0) cols <- list(Treatment = c("Control", "Bleomycin"))
+
+    cols <- lapply(cols, rep_len, length(idents))
+    df   <- as.data.frame(cols, stringsAsFactors = FALSE)
+
+    if (key == "column") {
+        df <- cbind(Sample = idents, df, stringsAsFactors = FALSE)
+    } else {
+        rownames(df) <- idents
+    }
+
+    df
+}
+
 #' Something that claims to be a Seurat object but is not a valid one.
 #'
 #' `inherits(x, "Seurat")` is TRUE, `validObject(x)` fails -- the case the
