@@ -105,3 +105,72 @@ local_mock_read10x <- function(counts = make_counts(), .env = parent.frame()) {
 local_root <- function(.env = parent.frame()) {
     withr::local_tempdir(.local_envir = .env)
 }
+
+# ---- in-memory Seurat objects --------------------------------------------
+#
+# mergeSeurat() takes objects, not paths, so its fixtures skip the filesystem
+# entirely and build real Seurat objects directly.
+
+#' Build a Seurat object with a known shape.
+#'
+#' `ident` sets both `project` and the `Ident` metadata column, mirroring what
+#' seuratFrom10x() produces. `ident = NULL` omits `Ident` altogether, which is
+#' how the post-merge Ident check is exercised.
+make_seurat <- function(ident = "Sample_A", n_cells = 10, n_genes = 20,
+                        assay = "RNA", cells = NULL) {
+    if (is.null(cells)) cells <- paste0("Cell", seq_len(n_cells))
+
+    m <- matrix(
+        1,
+        nrow     = n_genes,
+        ncol     = length(cells),
+        dimnames = list(paste0("Gene", seq_len(n_genes)), cells)
+    )
+
+    obj <- Seurat::CreateSeuratObject(
+        counts       = Matrix::Matrix(m, sparse = TRUE),
+        project      = if (is.null(ident)) "SeuratProject" else ident,
+        min.cells    = 0,
+        min.features = 0,
+        assay        = assay
+    )
+
+    if (!is.null(ident)) obj$Ident <- ident
+    obj
+}
+
+#' A named list of Seurat objects, one per ident.
+make_seurat_list <- function(idents = c("Sample_A", "Sample_B"), ...) {
+    stats::setNames(lapply(idents, make_seurat, ...), idents)
+}
+
+#' A Seurat object with zero cells.
+#'
+#' Seurat refuses to *construct* one (CreateSeuratObject and `[` both reject
+#' empty input), so this hollows out a real object instead: emptied count and
+#' data matrices, no metadata rows. The result still passes `inherits()` and
+#' `validObject()`, which is exactly what mergeSeurat()'s zero-cell guard is
+#' there to catch.
+make_empty_seurat <- function(ident = "Sample_Empty", n_genes = 20) {
+    obj   <- make_seurat(ident, n_cells = 2, n_genes = n_genes)
+    empty <- Matrix::Matrix(
+        matrix(0, nrow = n_genes, ncol = 0,
+               dimnames = list(rownames(obj), character(0))),
+        sparse = TRUE
+    )
+
+    obj@assays[[Seurat::DefaultAssay(obj)]]@counts <- empty
+    obj@assays[[Seurat::DefaultAssay(obj)]]@data   <- empty
+    obj@meta.data    <- obj@meta.data[0, , drop = FALSE]
+    obj@active.ident <- factor(character(0))
+
+    obj
+}
+
+#' Something that claims to be a Seurat object but is not a valid one.
+#'
+#' `inherits(x, "Seurat")` is TRUE, `validObject(x)` fails -- the case the
+#' two-part validity check in mergeSeurat() exists for.
+make_fake_seurat <- function() {
+    structure(list(), class = "Seurat")
+}
