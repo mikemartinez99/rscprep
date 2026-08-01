@@ -1,0 +1,97 @@
+---
+title: "Reading 10x Genomics data into Seurat objects"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Reading 10x Genomics data into Seurat objects}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  eval     = FALSE  # paths below are illustrative, not real -- flip to TRUE
+                     # once this vignette points at a bundled example dataset
+)
+```
+
+```{r setup}
+library(scPrepR)
+library(Seurat)
+```
+
+`seuratFrom10x()` handles the two shapes 10x Cell Ranger output actually comes
+in -- standard single-sample `cellranger count` runs, and demuxed
+`cellranger multi` runs -- behind one interface, so downstream code doesn't
+need to branch on which one it's looking at.
+
+You can point it at a single sample or run directly, or hand it a manifest
+describing a batch of runs with mixed multiplexing status. Either way, it
+returns a named list of Seurat objects, one per sample, ready to merge or
+process independently.
+
+## A single, non-multiplexed sample
+
+```{r single-sample}
+seurat_list <- seuratFrom10x(
+  path        = "/path/to/Sample_1/outs",
+  multiplexed = FALSE
+)
+
+seurat_list$Sample_1
+```
+
+`path` should point to the Cell Ranger `outs/` directory -- the function
+looks for `filtered_feature_bc_matrix.h5` directly inside it. The sample name
+is inferred from the parent folder (`Sample_1`, one level up from `outs`).
+
+## A single multiplexed run
+
+```{r multiplexed-run}
+seurat_list <- seuratFrom10x(
+  path        = "/path/to/Pool1/outs",
+  multiplexed = TRUE
+)
+
+names(seurat_list)
+#> [1] "Bleo_18_Slim_10" "Bleo_22_Slim_14" ...
+```
+
+For `cellranger multi` output, one `outs/` directory contains multiple
+demuxed samples under `per_sample_outs/<sample>/`. `seuratFrom10x()` reads
+each sample's `sample_filtered_feature_bc_matrix.h5` separately and returns
+one Seurat object per demuxed sample -- a single function call here returns a
+list, not a single object.
+
+## A batch of runs via manifest
+
+```{r manifest-batch}
+manifest <- data.frame(
+  Path = c(
+    "/path/to/Sample_1/outs",
+    "/path/to/Sample_2/outs",
+    "/path/to/Pool1/outs"
+  ),
+  multiplexed = c(FALSE, FALSE, TRUE)
+)
+
+seurat_list <- seuratFrom10x(manifest = manifest, min.cells = 3, min.features = 200)
+```
+
+The manifest needs a `Path` column (each row's `outs/` directory) and a
+logical `multiplexed` column. Rows can mix multiplexed and non-multiplexed
+runs freely -- each row is resolved independently, and a multiplexed row
+expands into multiple entries in the returned list. If a sample's expected H5
+file is missing, that row is skipped with a warning rather than failing the
+whole batch; single-path mode fails immediately instead, since there's
+nothing left to fall back on.
+
+## Notes
+
+`min.cells` and `min.features` are passed straight through to
+`Seurat::CreateSeuratObject()` and apply uniformly across every sample in a
+batch -- set them once at the level of granularity you actually want, not
+per-sample. The function forces classic (v4-style) Seurat assay objects
+internally regardless of which Seurat package version is installed, so
+results are consistent even in mixed-Seurat-version environments.
