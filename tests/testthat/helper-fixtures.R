@@ -1,4 +1,4 @@
-# Test fixtures for scPrepR.
+# Test fixtures for preproSCessR.
 #
 # Strategy: the package's real logic is *path resolution* -- deciding which H5
 # file to look for, what to name the resulting sample, and whether a missing
@@ -76,6 +76,52 @@ make_multi_run <- function(root, run = "Pool1", samples = c("Sample_A", "Sample_
     }
 
     outs
+}
+
+#' Add a raw feature barcode matrix to an existing `outs` directory.
+#'
+#' `where = "flat"` writes `<outs>/raw_feature_bc_matrix.h5`, the
+#' `cellranger count` location. `where = "multi"` writes
+#' `<outs>/multi/count/raw_feature_bc_matrix.h5`, where `cellranger multi`
+#' puts the single run-level raw matrix it produces for the whole pool.
+#' Returns the path of the file created.
+add_raw_h5 <- function(outs, where = c("flat", "multi")) {
+    where <- match.arg(where)
+
+    dir <- if (where == "multi") file.path(outs, "multi", "count") else outs
+    dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+
+    h5 <- file.path(dir, "raw_feature_bc_matrix.h5")
+    file.create(h5)
+    h5
+}
+
+#' A raw-matrix-shaped counts matrix with a knee in it.
+#'
+#' `n_cells` barcodes at ~`depth` UMIs sit above a long tail of `n_empty`
+#' ambient barcodes, which is the shape DropletUtils::barcodeRanks() needs to
+#' find a knee and an inflection point. Kept small enough to rank quickly, and
+#' deliberately spread over many distinct totals so the fit has unique points
+#' to work with.
+make_raw_counts <- function(n_genes = 40, n_cells = 300, n_empty = 3000,
+                            depth = 40, seed = 42) {
+    withr::with_seed(seed, {
+        cells <- Matrix::rsparsematrix(
+            n_genes, n_cells, density = 0.7,
+            rand.x = function(n) stats::rpois(n, depth)
+        )
+        empty <- Matrix::rsparsematrix(
+            n_genes, n_empty, density = 0.05,
+            rand.x = function(n) stats::rpois(n, 1) + 1
+        )
+    })
+
+    m <- cbind(cells, empty)
+    dimnames(m) <- list(
+        paste0("Gene", seq_len(n_genes)),
+        paste0(sprintf("%016d", seq_len(n_cells + n_empty)), "-1")
+    )
+    methods::as(m, "CsparseMatrix")
 }
 
 # ---- mocking -------------------------------------------------------------

@@ -68,17 +68,7 @@
 seuratFrom10x <- function(manifest = NULL, path = NULL, multiplexed = NULL,
                            min.cells = 10, min.features = 50) {
 
-    if (is.null(manifest) && is.null(path)) {
-        cli::cli_abort("Provide either {.arg manifest} or {.arg path}.")
-    }
-    if (!is.null(manifest) && !is.null(path)) {
-        cli::cli_abort("Provide only one of {.arg manifest} or {.arg path}, not both.")
-    }
-    if (!is.null(path) && is.null(multiplexed)) {
-        cli::cli_abort(
-            "When using {.arg path}, you must also specify {.arg multiplexed} ({.val {TRUE}}/{.val {FALSE}})."
-        )
-    }
+    validateSourceArgs(manifest, path, multiplexed)
 
     # A missing H5 is fatal in path mode -- there is no other sample to fall
     # back on -- so the injected handler aborts instead of warning.
@@ -90,7 +80,7 @@ seuratFrom10x <- function(manifest = NULL, path = NULL, multiplexed = NULL,
             seurat_list <- readMultiplexedRun10x(path, min.cells, min.features,
                                                   on_missing = fatal)
         } else {
-            ident <- basename(dirname(path))
+            ident <- identFromOutsDir(path)
             seurat <- readOneSample10x(path, ident, min.cells, min.features,
                                         on_missing = fatal)
             seurat_list <- setNames(list(seurat), ident)
@@ -99,26 +89,14 @@ seuratFrom10x <- function(manifest = NULL, path = NULL, multiplexed = NULL,
         return(seurat_list)
     }
 
-    required_cols <- c("Path", "multiplexed")
-    missing_cols <- setdiff(required_cols, colnames(manifest))
-    if (length(missing_cols) > 0) {
-        cli::cli_abort(
-            "{.arg manifest} is missing required column{?s}: {.field {missing_cols}}"
-        )
-    }
-    if (nrow(manifest) == 0) cli::cli_abort("{.arg manifest} has no rows.")
-    if (!is.logical(manifest$multiplexed)) {
-        cli::cli_abort(
-            "{.field manifest$multiplexed} must be logical ({.val {TRUE}}/{.val {FALSE}})."
-        )
-    }
+    validateManifest(manifest)
 
     seurat_list <- lapply(seq_len(nrow(manifest)), function(row_i) {
         outs_dir <- sub("/+$", "", manifest$Path[row_i])
         if (manifest$multiplexed[row_i]) {
             readMultiplexedRun10x(outs_dir, min.cells, min.features)
         } else {
-            ident <- basename(dirname(outs_dir))
+            ident <- identFromOutsDir(outs_dir)
             setNames(list(readOneSample10x(outs_dir, ident, min.cells, min.features)), ident)
         }
     })
