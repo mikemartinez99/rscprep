@@ -206,3 +206,92 @@ test_that("errors name the argument as the caller wrote it", {
     my_object <- 42
     expect_error(diagnoseQC(my_object), "my_object")
 })
+
+# ---- doCellCycle ---------------------------------------------------------
+#
+# The flag hands the annotated object to runCellCycle(); what that function
+# itself does is covered in test-runCellCycle.R. What matters here is that the
+# flag is wired at all, and that it passes the same organism through.
+#
+# These build on make_cellcycle_seurat() rather than make_pattern_seurat():
+# the latter's counts are all 1, which is what makes the percentage metrics
+# exact, but leaves every gene with the same average expression so
+# CellCycleScoring() cannot bin them.
+
+#' An object diagnoseQC() can annotate *and* runCellCycle() can score.
+#'
+#' `cc` supplies the cell cycle markers to embed, so a mocked non-human run
+#' can be given the pseudo-orthologs it will be looking for.
+cellcycle_ready <- function(cc = c(Seurat::cc.genes$s.genes,
+                                   Seurat::cc.genes$g2m.genes),
+                            mito = c("mt-Co1", "mt-Co2", "mt-Nd1"),
+                            ribo = c("Rps3", "Rpl4")) {
+    make_cellcycle_seurat(markers = c(mito, ribo, cc), normalise = TRUE)
+}
+
+test_that("scoring is off by default", {
+    res <- diagnoseQC(make_pattern_seurat(), "mmu")
+
+    expect_false("Phase" %in% colnames(res@meta.data))
+    expect_false("S.Score" %in% colnames(res@meta.data))
+})
+
+test_that("doCellCycle = TRUE adds the phase columns as well as the metrics", {
+    skip_if_not_installed("orthogene")
+    local_mock_orthologs()
+
+    obj <- cellcycle_ready(cc = pseudo_ortholog(c(Seurat::cc.genes$s.genes,
+                                                  Seurat::cc.genes$g2m.genes)))
+    res <- diagnoseQC(obj, "mmu", doCellCycle = TRUE)
+
+    expect_true(all(c("pctMito", "pctRibo", "log10GenesPerUMI",
+                      "S.Score", "G2M.Score", "Phase") %in% colnames(res@meta.data)))
+})
+
+test_that("the metrics are calculated whether or not scoring runs", {
+    skip_if_not_installed("orthogene")
+    local_mock_orthologs()
+
+    obj <- cellcycle_ready(cc = pseudo_ortholog(c(Seurat::cc.genes$s.genes,
+                                                  Seurat::cc.genes$g2m.genes)))
+
+    with    <- diagnoseQC(obj, "mmu", doCellCycle = TRUE)
+    without <- diagnoseQC(obj, "mmu", doCellCycle = FALSE)
+
+    expect_equal(with$pctMito, without$pctMito)
+    expect_equal(with$log10GenesPerUMI, without$log10GenesPerUMI)
+})
+
+test_that("the organism is passed through to scoring", {
+    # human markers are in the object, so scoring succeeds only if "hsa" was
+    # forwarded rather than a default or some other code
+    obj <- cellcycle_ready(mito = "MT-CO1", ribo = "RPS3")
+
+    res <- diagnoseQC(obj, "hsa", doCellCycle = TRUE)
+
+    expect_true(all(res$Phase %in% c("G1", "S", "G2M")))
+    expect_equal(sum(table(res$Phase)), ncol(res))
+})
+
+test_that("a scoring failure is not swallowed", {
+    # no cell cycle markers in the object at all. Human, so that the failure
+    # under test is the empty overlap and not a live ortholog lookup.
+    obj <- cellcycle_ready(cc = character(0), mito = "MT-CO1", ribo = "RPS3")
+
+    expect_error(diagnoseQC(obj, "hsa", doCellCycle = TRUE), "None of the")
+})
+
+test_that("doCellCycle must be a single non-NA logical", {
+    obj <- make_pattern_seurat()
+
+    expect_error(diagnoseQC(obj, "mmu", doCellCycle = "yes"), "TRUE.*FALSE")
+    expect_error(diagnoseQC(obj, "mmu", doCellCycle = NA), "TRUE.*FALSE")
+    expect_error(diagnoseQC(obj, "mmu", doCellCycle = c(TRUE, FALSE)), "TRUE.*FALSE")
+})
+
+test_that("doCellCycle is validated before any metric is calculated", {
+    obj <- make_pattern_seurat()
+
+    expect_error(diagnoseQC(obj, "mmu", doCellCycle = "yes"), "TRUE.*FALSE")
+    expect_false("pctMito" %in% colnames(obj@meta.data))
+})

@@ -63,7 +63,7 @@ mergeSeurat <- function(objList) {
 
     #== Guard against empty or trivial input
     if (length(objList) == 0) {
-        cli::cli_abort("'{arg_name}' is empty — nothing to merge.")
+        cli::cli_abort("'{arg_name}' is empty -- nothing to merge.")
     }
     if (length(objList) == 1) {
         cli::cli_alert_info("'{arg_name}' has only one object; returning it unmerged.")
@@ -88,7 +88,7 @@ mergeSeurat <- function(objList) {
 
     #== Names must exist, be non-blank, and be unique -- add.cell.id relies on this
     if (is.null(samples) || anyNA(samples) || any(samples == "")) {
-        cli::cli_abort("'{arg_name}' must be fully named — found missing or blank name(s).")
+        cli::cli_abort("'{arg_name}' must be fully named -- found missing or blank name(s).")
     }
     if (anyDuplicated(samples)) {
         dupes <- unique(samples[duplicated(samples)])
