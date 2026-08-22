@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-library(preproSCessR)
+library(rscprep)
 library(Seurat)
 ```
 
@@ -31,7 +31,7 @@ workflow, without losing track of which cell came from which sample.
 ```{r pipeline}
 seurat_list <- seuratFrom10x(
   path        = "/path/to/Pool1/outs",
-  multiplexed = TRUE
+  multi = TRUE
 )
 
 merged <- mergeSeurat(seurat_list)
@@ -94,7 +94,7 @@ A single-element list short-circuits. The lone object is returned as-is,
 with a message -- unmerged, and with its barcodes left unprefixed:
 
 ```{r single}
-one <- seuratFrom10x(path = "/path/to/Sample_1/outs", multiplexed = FALSE)
+one <- seuratFrom10x(path = "/path/to/Sample_1/outs", multi = FALSE)
 
 merged <- mergeSeurat(one)
 #> i 'one' has only one object; returning it unmerged.
