@@ -355,6 +355,36 @@ cutoffLayers <- function(value, label, colour, x_at, vjust) {
     )
 }
 
+#' Point size and opacity for a curve of `n` points
+#'
+#' A barcode rank curve can be a few hundred points or a few thousand,
+#' depending on how many distinct totals the raw matrix holds, and one fixed
+#' size cannot serve both. Too large and a dense curve fuses into a solid band
+#' that hides where the plateau ends; too small and a sparse one is a scatter
+#' of specks with no visible line through it.
+#'
+#' Both values are interpolated on `log10(n)` between anchors at 100 and
+#' 10,000 points and clamped outside that range, so the curve reads as a curve
+#' at either extreme. Translucency does the same work as size here: overlapping
+#' points accumulate into visible density rather than saturating, which is what
+#' makes the ambient tail's thickness legible.
+#'
+#' @param n Number of points to be drawn -- `nrow()` of the curve.
+#'
+#' @return A list of `size` and `alpha`, ready for [ggplot2::geom_point()].
+#'
+#' @noRd
+pointAesthetics <- function(n) {
+    if (length(n) != 1 || !is.finite(n)) n <- 1
+
+    #== 0 at 100 points or fewer, 1 at 10,000 or more
+    t <- (log10(max(n, 1)) - 2) / 2
+    t <- min(max(t, 0), 1)
+
+    list(size  = 1.7 - t * 1.2,
+         alpha = 0.9 - t * 0.55)
+}
+
 #' Build the barcode rank figure for one run
 #'
 #' @param result A `summariseBarcodeRanks()` result.
