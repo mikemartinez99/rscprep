@@ -4,7 +4,7 @@
 \alias{diagnoseQC}
 \title{Add Per-Cell QC Metrics to a Seurat Object}
 \usage{
-diagnoseQC(obj, organism = c("hsa", "mmu", "rno", "dre"))
+diagnoseQC(obj, organism = c("hsa", "mmu", "rno", "dre"), doCellCycle = FALSE)
 }
 \arguments{
 \item{obj}{A single \link[Seurat:reexports]{Seurat} object, typically
@@ -15,6 +15,13 @@ are always calculated on the same object the QC plots are drawn from.}
 \item{organism}{Three-letter code selecting the gene patterns: \code{"hsa"}
 (human, the default), \code{"mmu"} (mouse), \code{"rno"} (rat) or \code{"dre"}
 (zebrafish). See \emph{Gene patterns by organism}.}
+
+\item{doCellCycle}{Also score cell cycle phase, by handing the annotated
+object to \code{\link[=runCellCycle]{runCellCycle()}} with the same \code{organism}. \code{FALSE} by default:
+unlike the metrics above, scoring assumes normalised data, and will
+normalise the object itself if it arrives raw. For a non-human organism it
+also needs \pkg{orthogene}. Call \code{\link[=runCellCycle]{runCellCycle()}} directly if you need its
+\code{method} argument.}
 }
 \value{
 The input object with three numeric metadata columns added:
@@ -22,6 +29,9 @@ The input object with three numeric metadata columns added:
 name are overwritten, so the function is safe to re-run -- with a
 different \code{organism}, for instance. Every other slot is untouched, and
 the cell count is unchanged.
+
+With \code{doCellCycle = TRUE}, \code{S.Score}, \code{G2M.Score} and \code{Phase} are added as
+well -- see \code{\link[=runCellCycle]{runCellCycle()}} for what they mean.
 }
 \description{
 Calculates the three per-cell metrics that single-cell filtering decisions

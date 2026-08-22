@@ -61,12 +61,21 @@
 #' @param organism Three-letter code selecting the gene patterns: `"hsa"`
 #'   (human, the default), `"mmu"` (mouse), `"rno"` (rat) or `"dre"`
 #'   (zebrafish). See *Gene patterns by organism*.
+#' @param doCellCycle Also score cell cycle phase, by handing the annotated
+#'   object to [runCellCycle()] with the same `organism`. `FALSE` by default:
+#'   unlike the metrics above, scoring assumes normalised data, and will
+#'   normalise the object itself if it arrives raw. For a non-human organism it
+#'   also needs \pkg{orthogene}. Call [runCellCycle()] directly if you need its
+#'   `method` argument.
 #'
 #' @return The input object with three numeric metadata columns added:
 #'   `pctMito`, `pctRibo` and `log10GenesPerUMI`. Existing columns of the same
 #'   name are overwritten, so the function is safe to re-run -- with a
 #'   different `organism`, for instance. Every other slot is untouched, and
 #'   the cell count is unchanged.
+#'
+#'   With `doCellCycle = TRUE`, `S.Score`, `G2M.Score` and `Phase` are added as
+#'   well -- see [runCellCycle()] for what they mean.
 #'
 #' @examples
 #' \dontrun{
@@ -86,7 +95,7 @@
 #'   calculation itself.
 #'
 #' @export
-diagnoseQC <- function(obj, organism = c("hsa", "mmu", "rno", "dre")) {
+diagnoseQC <- function(obj, organism = c("hsa", "mmu", "rno", "dre"), doCellCycle = FALSE) {
     arg_name <- deparse(substitute(obj))
     validateQCObject(obj, arg_name)
 
@@ -94,6 +103,10 @@ diagnoseQC <- function(obj, organism = c("hsa", "mmu", "rno", "dre")) {
     #== unresolved `organism` would report all four as the one in use.
     organism <- resolveOrganism(organism)
     patterns <- genePatterns(organism)
+
+    if (!is.logical(doCellCycle) || length(doCellCycle) != 1 || is.na(doCellCycle)) {
+        cli::cli_abort("{.arg doCellCycle} must be either {.val {TRUE}} or {.val {FALSE}}.")
+    }
 
     #== Read the count columns off the default assay rather than hardcoding
     #== "RNA", so a re-keyed object still works without an extra argument.
@@ -179,6 +192,12 @@ diagnoseQC <- function(obj, organism = c("hsa", "mmu", "rno", "dre")) {
         "*" = "{.field pctRibo}: median {med_ribo}%, max {max_ribo}%",
         "*" = "{.field log10GenesPerUMI}: median {med_cplx}"
     ))
+
+    #== Scoring is opt-in because, unlike the metrics above, it assumes the
+    #== data have been normalised -- and warns on its own if they have not.
+    if (doCellCycle) {
+        obj <- runCellCycle(obj, organism)
+    }
 
     obj
 }
