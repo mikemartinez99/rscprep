@@ -3,7 +3,7 @@
 #' The raw-matrix counterpart of [seuratFrom10x()]. Reads the *unfiltered*
 #' feature barcode matrix H5 -- every barcode Cell Ranger saw, not just the
 #' ones it called as cells -- for one or more runs, taking the same
-#' `manifest` / `path` / `multiplexed` arguments.
+#' `manifest` / `path` / `multi` arguments.
 #'
 #' This is the input a barcode rank plot needs. Cell calling is exactly the
 #' step that separates the raw matrix from the filtered one, so a plot meant to
@@ -22,19 +22,19 @@
 #' the column sums. Filtered matrices, which are already cell-called, are what
 #' [seuratFrom10x()] wraps in Seurat objects.
 #'
-#' @section Multiplexed runs yield one matrix per run, not per sample:
+#' @section `cellranger multi` runs yield one matrix per run, not per sample:
 #'
 #' This is the one place where the return shape differs from
 #' [seuratFrom10x()]. `cellranger multi` writes a single run-level raw matrix
 #' at `outs/multi/count/raw_feature_bc_matrix.h5`, shared by every demuxed
 #' sample in the pool -- cell calling happens once for the whole GEM well, and
 #' only afterwards are the called barcodes assigned to samples. There is
-#' therefore no per-sample raw matrix to read, and a multiplexed row expands to
-#' one entry named after the run directory rather than to N entries named after
-#' the demuxed samples.
+#' therefore no per-sample raw matrix to read, and a `multi = TRUE` row expands
+#' to one entry named after the run directory rather than to N entries named
+#' after the demuxed samples.
 #'
-#' Read that way, a barcode rank curve from a multiplexed run describes the
-#' pool, which is the level at which the knee is a meaningful diagnostic.
+#' Read that way, a barcode rank curve from a pooled run describes the pool,
+#' which is the level at which the knee is a meaningful diagnostic.
 #'
 #' @inheritParams seuratFrom10x
 #'
@@ -46,17 +46,17 @@
 #' @examples
 #' \dontrun{
 #' # One run
-#' raw <- rawMatrixFrom10x(path = "/path/to/Sample_1/outs", multiplexed = FALSE)
+#' raw <- rawMatrixFrom10x(path = "/path/to/Sample_1/outs", multi = FALSE)
 #' dim(raw[["Sample_1"]])
 #'
-#' # A multiplexed pool -- one matrix for the whole run, not one per sample
-#' raw <- rawMatrixFrom10x(path = "/path/to/Pool1/outs", multiplexed = TRUE)
+#' # A pool -- one matrix for the whole run, not one per demuxed sample
+#' raw <- rawMatrixFrom10x(path = "/path/to/Pool1/outs", multi = TRUE)
 #' names(raw)
 #'
 #' # Several runs from a manifest. Watch memory: these are large.
 #' manifest <- data.frame(
-#'   Path        = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
-#'   multiplexed = c(FALSE, TRUE)
+#'   Path  = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
+#'   multi = c(FALSE, TRUE)
 #' )
 #' raw <- rawMatrixFrom10x(manifest = manifest)
 #'
@@ -69,17 +69,19 @@
 #'
 #' @importFrom Seurat Read10X_h5
 #' @export
-rawMatrixFrom10x <- function(manifest = NULL, path = NULL, multiplexed = NULL) {
+rawMatrixFrom10x <- function(manifest = NULL, path = NULL, multi = NULL,
+                             multiplexed = NULL) {
 
-    validateSourceArgs(manifest, path, multiplexed)
-    if (!is.null(manifest)) validateManifest(manifest)
+    src      <- prepareSource(manifest, path, multi, multiplexed)
+    manifest <- src$manifest
+    multi    <- src$multi
 
     # A missing H5 is fatal in path mode -- there is no other run to fall back
     # on -- so the injected handler aborts instead of warning.
     fatal      <- function(msg) cli::cli_abort("{msg}", call = NULL)
     on_missing <- if (is.null(path)) function(msg) cli::cli_warn("{msg}") else fatal
 
-    runs <- enumerateRawRuns(manifest, path, multiplexed)
+    runs <- enumerateRawRuns(manifest, path, multi)
 
     if (nrow(runs) > 1) {
         cli::cli_alert_info(
@@ -89,10 +91,10 @@ rawMatrixFrom10x <- function(manifest = NULL, path = NULL, multiplexed = NULL) {
 
     raw_list <- lapply(seq_len(nrow(runs)), function(i) {
         readOneRaw10x(
-            outs_dir    = runs$outs_dir[i],
-            ident       = runs$ident[i],
-            multiplexed = runs$multiplexed[i],
-            on_missing  = on_missing
+            outs_dir   = runs$outs_dir[i],
+            ident      = runs$ident[i],
+            multi      = runs$multi[i],
+            on_missing = on_missing
         )
     })
     names(raw_list) <- runs$ident

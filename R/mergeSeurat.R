@@ -41,7 +41,7 @@
 #' \dontrun{
 #' seurat_list <- seuratFrom10x(
 #'   path        = "/path/to/Pool1/outs",
-#'   multiplexed = TRUE
+#'   multi = TRUE
 #' )
 #'
 #' merged <- mergeSeurat(seurat_list)

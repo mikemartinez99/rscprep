@@ -3,7 +3,7 @@
 #' Draws the standard barcode rank plot for one or more Cell Ranger runs: total
 #' UMI count against barcode rank on log-log axes, with the fitted spline and
 #' the knee and inflection points [DropletUtils::barcodeRanks()] identifies.
-#' Takes the same `manifest` / `path` / `multiplexed` arguments as
+#' Takes the same `manifest` / `path` / `multi` arguments as
 #' [seuratFrom10x()], and returns both the plotted curve and the figure for
 #' every run.
 #'
@@ -82,15 +82,15 @@
 #' @examples
 #' \dontrun{
 #' # One run, in memory
-#' ranks <- plotBarcodeRanks(path = "/path/to/Sample_1/outs", multiplexed = FALSE)
+#' ranks <- plotBarcodeRanks(path = "/path/to/Sample_1/outs", multi = FALSE)
 #' ranks$Sample_1$plot
 #' head(ranks$Sample_1$data)
 #' ranks$Sample_1$knee
 #'
 #' # Every run in a manifest, with CSVs and PNGs written out
 #' manifest <- data.frame(
-#'   Path        = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
-#'   multiplexed = c(FALSE, TRUE)
+#'   Path  = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
+#'   multi = c(FALSE, TRUE)
 #' )
 #' ranks <- plotBarcodeRanks(manifest = manifest, outdir = "qc/barcode_ranks")
 #'
@@ -118,17 +118,20 @@
 #'
 #' @importFrom ggplot2 .data
 #' @export
-plotBarcodeRanks <- function(manifest = NULL, path = NULL, multiplexed = NULL,
+plotBarcodeRanks <- function(manifest = NULL, path = NULL, multi = NULL,
                              lower  = 100,
                              outdir = NULL,
                              width  = 6.5,
                              height = 5,
                              dpi    = 300,
-                             ...) {
+                             ...,
+                             multiplexed = NULL) {
 
     requireBarcodeRankPkgs()
-    validateSourceArgs(manifest, path, multiplexed)
-    if (!is.null(manifest)) validateManifest(manifest)
+
+    src      <- prepareSource(manifest, path, multi, multiplexed)
+    manifest <- src$manifest
+    multi    <- src$multi
 
     if (!is.numeric(lower) || length(lower) != 1 || is.na(lower) || lower < 0) {
         cli::cli_abort("'lower' must be a single non-negative number.")
@@ -143,17 +146,17 @@ plotBarcodeRanks <- function(manifest = NULL, path = NULL, multiplexed = NULL,
         function(msg) cli::cli_abort("{msg}", call = NULL)
     }
 
-    runs <- enumerateRawRuns(manifest, path, multiplexed)
+    runs <- enumerateRawRuns(manifest, path, multi)
 
     results <- lapply(seq_len(nrow(runs)), function(i) {
         ident <- runs$ident[i]
-        h5    <- resolveRawH5(runs$outs_dir[i], runs$multiplexed[i])
+        h5    <- resolveRawH5(runs$outs_dir[i], runs$multi[i])
 
         counts <- readOneRaw10x(
-            outs_dir    = runs$outs_dir[i],
-            ident       = ident,
-            multiplexed = runs$multiplexed[i],
-            on_missing  = on_problem
+            outs_dir   = runs$outs_dir[i],
+            ident      = ident,
+            multi      = runs$multi[i],
+            on_missing = on_problem
         )
         if (is.null(counts)) return(NULL)
 
