@@ -52,7 +52,7 @@ the inputs'. The first of these relies on each input object carrying an
 \dontrun{
 seurat_list <- seuratFrom10x(
   path        = "/path/to/Pool1/outs",
-  multiplexed = TRUE
+  multi = TRUE
 )
 
 merged <- mergeSeurat(seurat_list)

@@ -61,7 +61,7 @@ sample name is still caught, since it also leaves some object without a row.
 \dontrun{
 seurat_list <- seuratFrom10x(
   path        = "/path/to/Pool1/outs",
-  multiplexed = TRUE
+  multi = TRUE
 )
 
 # one row per demuxed sample, however many the run produced

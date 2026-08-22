@@ -7,27 +7,28 @@
 plotBarcodeRanks(
   manifest = NULL,
   path = NULL,
-  multiplexed = NULL,
+  multi = NULL,
   lower = 100,
   outdir = NULL,
   width = 6.5,
   height = 5,
   dpi = 300,
-  ...
+  ...,
+  multiplexed = NULL
 )
 }
 \arguments{
 \item{manifest}{Data frame with columns \code{Path} (character; path to each
-run's \verb{outs/} directory) and \code{multiplexed} (logical). Mutually exclusive
-with \code{path}.}
+run's \verb{outs/} directory) and \code{multi} (logical). Rows may mix the two
+pipelines freely. Mutually exclusive with \code{path}.}
 
 \item{path}{Character string. Path to a single Cell Ranger \verb{outs/}
 directory. Mutually exclusive with \code{manifest}.}
 
-\item{multiplexed}{Logical. Whether \code{path} refers to a multiplexed
-(\verb{cellranger multi}) run. Required when \code{path} is supplied; ignored when
-\code{manifest} is supplied, since multiplexing status is read per-row from
-\code{manifest$multiplexed} instead.}
+\item{multi}{Logical. Whether \code{path} was produced by \verb{cellranger multi}
+rather than \verb{cellranger count} -- see the section above. Required when
+\code{path} is supplied; ignored when \code{manifest} is supplied, since the
+pipeline is read per-row from \code{manifest$multi} instead.}
 
 \item{lower}{Total UMI count at or below which a barcode is assumed to be
 empty. Used by \code{\link[DropletUtils:barcodeRanks]{DropletUtils::barcodeRanks()}} to estimate the ambient
@@ -44,6 +45,9 @@ supplied. Ignored otherwise.}
 
 \item{...}{Further arguments to \code{\link[DropletUtils:barcodeRanks]{DropletUtils::barcodeRanks()}}, such as
 \code{fit.bounds}, \code{exclude.from} or \code{df}.}
+
+\item{multiplexed}{Deprecated. The former name of \code{multi}; still accepted,
+with a warning.}
 }
 \value{
 A named list with one element per run, each a list of:
@@ -73,7 +77,7 @@ mode either raises an error instead.
 Draws the standard barcode rank plot for one or more Cell Ranger runs: total
 UMI count against barcode rank on log-log axes, with the fitted spline and
 the knee and inflection points \code{\link[DropletUtils:barcodeRanks]{DropletUtils::barcodeRanks()}} identifies.
-Takes the same \code{manifest} / \code{path} / \code{multiplexed} arguments as
+Takes the same \code{manifest} / \code{path} / \code{multi} arguments as
 \code{\link[=seuratFrom10x]{seuratFrom10x()}}, and returns both the plotted curve and the figure for
 every run.
 }
@@ -120,15 +124,15 @@ you genuinely need the matrices themselves, and it makes no such promise.
 \examples{
 \dontrun{
 # One run, in memory
-ranks <- plotBarcodeRanks(path = "/path/to/Sample_1/outs", multiplexed = FALSE)
+ranks <- plotBarcodeRanks(path = "/path/to/Sample_1/outs", multi = FALSE)
 ranks$Sample_1$plot
 head(ranks$Sample_1$data)
 ranks$Sample_1$knee
 
 # Every run in a manifest, with CSVs and PNGs written out
 manifest <- data.frame(
-  Path        = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
-  multiplexed = c(FALSE, TRUE)
+  Path  = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
+  multi = c(FALSE, TRUE)
 )
 ranks <- plotBarcodeRanks(manifest = manifest, outdir = "qc/barcode_ranks")
 

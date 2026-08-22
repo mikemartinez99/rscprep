@@ -4,20 +4,28 @@
 \alias{rawMatrixFrom10x}
 \title{Read 10x Genomics Raw (Unfiltered) Feature Barcode Matrices}
 \usage{
-rawMatrixFrom10x(manifest = NULL, path = NULL, multiplexed = NULL)
+rawMatrixFrom10x(
+  manifest = NULL,
+  path = NULL,
+  multi = NULL,
+  multiplexed = NULL
+)
 }
 \arguments{
 \item{manifest}{Data frame with columns \code{Path} (character; path to each
-run's \verb{outs/} directory) and \code{multiplexed} (logical). Mutually exclusive
-with \code{path}.}
+run's \verb{outs/} directory) and \code{multi} (logical). Rows may mix the two
+pipelines freely. Mutually exclusive with \code{path}.}
 
 \item{path}{Character string. Path to a single Cell Ranger \verb{outs/}
 directory. Mutually exclusive with \code{manifest}.}
 
-\item{multiplexed}{Logical. Whether \code{path} refers to a multiplexed
-(\verb{cellranger multi}) run. Required when \code{path} is supplied; ignored when
-\code{manifest} is supplied, since multiplexing status is read per-row from
-\code{manifest$multiplexed} instead.}
+\item{multi}{Logical. Whether \code{path} was produced by \verb{cellranger multi}
+rather than \verb{cellranger count} -- see the section above. Required when
+\code{path} is supplied; ignored when \code{manifest} is supplied, since the
+pipeline is read per-row from \code{manifest$multi} instead.}
+
+\item{multiplexed}{Deprecated. The former name of \code{multi}; still accepted,
+with a warning.}
 }
 \value{
 A named list of sparse count matrices (features x barcodes), one per
@@ -29,7 +37,7 @@ missing are dropped from the manifest-mode result with a warning; in
 The raw-matrix counterpart of \code{\link[=seuratFrom10x]{seuratFrom10x()}}. Reads the \emph{unfiltered}
 feature barcode matrix H5 -- every barcode Cell Ranger saw, not just the
 ones it called as cells -- for one or more runs, taking the same
-\code{manifest} / \code{path} / \code{multiplexed} arguments.
+\code{manifest} / \code{path} / \code{multi} arguments.
 }
 \details{
 This is the input a barcode rank plot needs. Cell calling is exactly the
@@ -51,7 +59,7 @@ the column sums. Filtered matrices, which are already cell-called, are what
 \code{\link[=seuratFrom10x]{seuratFrom10x()}} wraps in Seurat objects.
 }
 
-\section{Multiplexed runs yield one matrix per run, not per sample}{
+\section{\verb{cellranger multi} runs yield one matrix per run, not per sample}{
 
 
 This is the one place where the return shape differs from
@@ -59,28 +67,28 @@ This is the one place where the return shape differs from
 at \code{outs/multi/count/raw_feature_bc_matrix.h5}, shared by every demuxed
 sample in the pool -- cell calling happens once for the whole GEM well, and
 only afterwards are the called barcodes assigned to samples. There is
-therefore no per-sample raw matrix to read, and a multiplexed row expands to
-one entry named after the run directory rather than to N entries named after
-the demuxed samples.
+therefore no per-sample raw matrix to read, and a \code{multi = TRUE} row expands
+to one entry named after the run directory rather than to N entries named
+after the demuxed samples.
 
-Read that way, a barcode rank curve from a multiplexed run describes the
-pool, which is the level at which the knee is a meaningful diagnostic.
+Read that way, a barcode rank curve from a pooled run describes the pool,
+which is the level at which the knee is a meaningful diagnostic.
 }
 
 \examples{
 \dontrun{
 # One run
-raw <- rawMatrixFrom10x(path = "/path/to/Sample_1/outs", multiplexed = FALSE)
+raw <- rawMatrixFrom10x(path = "/path/to/Sample_1/outs", multi = FALSE)
 dim(raw[["Sample_1"]])
 
-# A multiplexed pool -- one matrix for the whole run, not one per sample
-raw <- rawMatrixFrom10x(path = "/path/to/Pool1/outs", multiplexed = TRUE)
+# A pool -- one matrix for the whole run, not one per demuxed sample
+raw <- rawMatrixFrom10x(path = "/path/to/Pool1/outs", multi = TRUE)
 names(raw)
 
 # Several runs from a manifest. Watch memory: these are large.
 manifest <- data.frame(
-  Path        = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
-  multiplexed = c(FALSE, TRUE)
+  Path  = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
+  multi = c(FALSE, TRUE)
 )
 raw <- rawMatrixFrom10x(manifest = manifest)
 

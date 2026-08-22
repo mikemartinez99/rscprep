@@ -7,29 +7,33 @@
 seuratFrom10x(
   manifest = NULL,
   path = NULL,
-  multiplexed = NULL,
+  multi = NULL,
   min.cells = 10,
-  min.features = 50
+  min.features = 50,
+  multiplexed = NULL
 )
 }
 \arguments{
 \item{manifest}{Data frame with columns \code{Path} (character; path to each
-run's \verb{outs/} directory) and \code{multiplexed} (logical). Mutually exclusive
-with \code{path}.}
+run's \verb{outs/} directory) and \code{multi} (logical). Rows may mix the two
+pipelines freely. Mutually exclusive with \code{path}.}
 
 \item{path}{Character string. Path to a single Cell Ranger \verb{outs/}
 directory. Mutually exclusive with \code{manifest}.}
 
-\item{multiplexed}{Logical. Whether \code{path} refers to a multiplexed
-(\verb{cellranger multi}) run. Required when \code{path} is supplied; ignored when
-\code{manifest} is supplied, since multiplexing status is read per-row from
-\code{manifest$multiplexed} instead.}
+\item{multi}{Logical. Whether \code{path} was produced by \verb{cellranger multi}
+rather than \verb{cellranger count} -- see the section above. Required when
+\code{path} is supplied; ignored when \code{manifest} is supplied, since the
+pipeline is read per-row from \code{manifest$multi} instead.}
 
 \item{min.cells}{Integer. Include features detected in at least this many
 cells. Passed to \code{\link[Seurat:reexports]{Seurat::CreateSeuratObject()}}.}
 
 \item{min.features}{Integer. Include cells where at least this many
 features are detected. Passed to \code{\link[Seurat:reexports]{Seurat::CreateSeuratObject()}}.}
+
+\item{multiplexed}{Deprecated. The former name of \code{multi}; still accepted,
+with a warning.}
 }
 \value{
 A named list of \link[Seurat:reexports]{Seurat} objects, one
@@ -42,43 +46,52 @@ with a warning; in \code{path} mode, a missing file raises an error instead.
 Reads one or more samples' filtered feature barcode matrix H5 files from
 10x Genomics Cell Ranger output and creates one
 \link[Seurat:reexports]{Seurat} object per sample. Supports both
-standard \verb{cellranger count} output (one sample per run) and multiplexed
-\verb{cellranger multi} output (multiple demuxed samples under
-\verb{outs/per_sample_outs/}), specified either as a single path or as a
-manifest describing multiple runs.
+\verb{cellranger count} output (one sample per run) and \verb{cellranger multi} output
+(one or more demuxed samples under \verb{outs/per_sample_outs/}), specified
+either as a single path or as a manifest describing multiple runs.
 }
 \details{
 Exactly one of \code{manifest} or \code{path} must be supplied.
-
-When \code{path} is supplied, it must point to a Cell Ranger \verb{outs/} directory.
-Set \code{multiplexed = TRUE} if that \verb{outs/} directory contains
-\verb{per_sample_outs/<sample>/sample_filtered_feature_bc_matrix.h5} for one or
-more demuxed samples, or \code{multiplexed = FALSE} if it directly contains
-\code{filtered_feature_bc_matrix.h5} for a single sample.
-
-When \code{manifest} is supplied, it must be a data frame with a \code{Path} column
-(one \verb{outs/} directory per row, following the same convention as \code{path}
-above) and a logical \code{multiplexed} column indicating which rows are
-multiplexed runs. Rows can mix multiplexed and non-multiplexed runs.
 }
+\section{Which pipeline wrote the run}{
+
+
+\code{multi} selects the output \emph{layout}, and the two Cell Ranger pipelines
+produce different ones:
+
+\describe{
+\item{\code{multi = FALSE}}{\verb{cellranger count}, which writes
+\code{outs/filtered_feature_bc_matrix.h5} for its single sample.}
+\item{\code{multi = TRUE}}{\verb{cellranger multi}, which writes
+\verb{outs/per_sample_outs/<sample>/count/sample_filtered_feature_bc_matrix.h5}
+for each sample it demuxed.}
+}
+
+The distinction is which pipeline ran, not how many samples came out of it.
+\verb{cellranger multi} writes \verb{per_sample_outs/} even when it demultiplexed a
+single sample -- the usual case for Flex and 5' runs -- so those need
+\code{multi = TRUE} despite not being multiplexed in any biological sense. That
+is why the argument is no longer called \code{multiplexed}.
+}
+
 \examples{
 \dontrun{
-# Single non-multiplexed sample
+# A `cellranger count` run
 seurat_list <- seuratFrom10x(
-  path        = "/path/to/Sample_1/outs",
-  multiplexed = FALSE
+  path  = "/path/to/Sample_1/outs",
+  multi = FALSE
 )
 
-# Single multiplexed run (multiple demuxed samples)
+# A `cellranger multi` run, expanding to one object per demuxed sample
 seurat_list <- seuratFrom10x(
-  path        = "/path/to/Pool1/outs",
-  multiplexed = TRUE
+  path  = "/path/to/Pool1/outs",
+  multi = TRUE
 )
 
-# Manifest describing multiple runs, mixed multiplexed status
+# Manifest describing several runs from either pipeline
 manifest <- data.frame(
-  Path        = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
-  multiplexed = c(FALSE, TRUE)
+  Path  = c("/path/to/Sample_1/outs", "/path/to/Pool1/outs"),
+  multi = c(FALSE, TRUE)
 )
 seurat_list <- seuratFrom10x(manifest = manifest, min.cells = 3, min.features = 200)
 }
