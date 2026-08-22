@@ -263,3 +263,89 @@ make_sample_sheet <- function(idents = c("Sample_A", "Sample_B"),
 make_fake_seurat <- function() {
     structure(list(), class = "Seurat")
 }
+
+# ---- QC fixtures ---------------------------------------------------------
+#
+# diagnoseQC() and flagQC() work on gene *names* and metadata *values*, not on
+# file layouts, so their fixtures build objects with both pinned exactly.
+#
+# Every count in make_pattern_seurat() is 1, which makes the percentage
+# metrics exact rather than approximate: with one count per gene per cell,
+# pctMito is 100 * n_mito / n_genes for every cell, so the expected value is
+# arithmetic rather than a tolerance.
+
+#' A Seurat object whose gene names carry organism-specific QC patterns.
+#'
+#' Defaults are mouse-style symbols (`mt-`, `Rp[sl]`). Pass human-style names
+#' to exercise a different organism, or `character(0)` to build an object a
+#' pattern cannot match at all.
+make_pattern_seurat <- function(mito    = c("mt-Co1", "mt-Co2", "mt-Nd1"),
+                                ribo    = c("Rps3", "Rpl4"),
+                                n_other = 15,
+                                n_cells = 20,
+                                ident   = "Sample_A",
+                                assay   = "RNA") {
+    genes <- c(mito, ribo, paste0("Gene", seq_len(n_other)))
+    cells <- paste0("Cell", seq_len(n_cells))
+
+    m <- matrix(1, nrow = length(genes), ncol = n_cells,
+                dimnames = list(genes, cells))
+
+    obj <- Seurat::CreateSeuratObject(
+        counts       = Matrix::Matrix(m, sparse = TRUE),
+        project      = ident,
+        min.cells    = 0,
+        min.features = 0,
+        assay        = assay
+    )
+    obj$Ident <- ident
+    obj
+}
+
+#' A Seurat object carrying metadata columns with exactly these values.
+#'
+#' flagQC() reads metadata, never counts, so setting the columns directly is
+#' what makes its thresholds predictable: the median and MAD of the input are
+#' known, so the expected cutoffs are arithmetic.
+#'
+#' `...` names the metadata columns; every one must be the same length, which
+#' sets the object's cell count. `ident` is recycled to one value per cell, so
+#' a vector splits the object into groups for `group_by`.
+make_metric_seurat <- function(..., ident = "Sample_A") {
+    metrics <- list(...)
+    if (length(metrics) == 0) stop("supply at least one metric column")
+
+    n   <- length(metrics[[1]])
+    obj <- make_seurat(ident = "Sample_A", n_cells = n, n_genes = 10)
+
+    for (nm in names(metrics)) {
+        obj[[nm]] <- stats::setNames(metrics[[nm]], colnames(obj))
+    }
+    obj$Ident <- stats::setNames(rep_len(ident, n), colnames(obj))
+    obj
+}
+
+#' Twenty values with a median of 6 and a MAD of exactly 2 * 1.4826.
+#'
+#' Sorted absolute deviations from the median are 0,0,0,0 then 2 x8 then 4 x8,
+#' so the median deviation is 2 whether or not `extreme` is appended -- adding
+#' one large value shifts neither statistic, which is the property that makes
+#' the expected thresholds hand-computable.
+#'
+#' With `nmads = 3` and `log = FALSE` the thresholds are 6 +/- 8.8956, so
+#' `extreme = 100` is flagged high and nothing is flagged low.
+metric_values <- function(extreme = NULL) {
+    c(rep(c(2, 4, 6, 8, 10), each = 4), extreme)
+}
+
+#' The same shape on a log2 scale: values are powers of two, so log2() of them
+#' is 1,2,3,4,5 (four each) and the median and MAD are exact there too.
+#'
+#' log2 median is 3 and log2 MAD is 1.4826, so with `nmads = 3` the upper
+#' threshold is 2^(3 + 3 * 1.4826) ~ 174.7 and `extreme = 1024` is flagged.
+log_metric_values <- function(extreme = NULL) {
+    c(rep(c(2, 4, 8, 16, 32), each = 4), extreme)
+}
+
+#' The MAD constant stats::mad() scales by.
+MAD_CONST <- 1.4826
