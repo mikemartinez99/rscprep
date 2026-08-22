@@ -485,7 +485,7 @@ test_that("annotated objects merge into one object with no NA cells", {
 
     # one manifest row, two demuxed samples, two different treatments --
     # the case that cannot be expressed in the manifest itself
-    seurat_list <- seuratFrom10x(path = outs, multiplexed = TRUE,
+    seurat_list <- seuratFrom10x(path = outs, multi = TRUE,
                                  min.cells = 0, min.features = 0)
     sheet <- data.frame(Sample    = c("Sample_A", "Sample_B"),
                         Treatment = c("Control", "Bleomycin"))

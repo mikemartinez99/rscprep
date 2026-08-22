@@ -210,7 +210,7 @@ test_that("the list seuratFrom10x() returns merges without adjustment", {
     local_mock_read10x()
     outs <- make_multi_run(root, "Pool1", c("Sample_A", "Sample_B"))
 
-    seurat_list <- seuratFrom10x(path = outs, multiplexed = TRUE,
+    seurat_list <- seuratFrom10x(path = outs, multi = TRUE,
                                  min.cells = 0, min.features = 0)
 
     expect_output(merged <- mergeSeurat(seurat_list))

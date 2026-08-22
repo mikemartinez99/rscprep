@@ -17,7 +17,7 @@ knitr::opts_chunk$set(
 ```
 
 ```{r setup}
-library(preproSCessR)
+library(rscprep)
 library(Seurat)
 ```
 
@@ -36,7 +36,7 @@ to add a `Treatment` column and be done:
 ```{r tempting}
 manifest <- data.frame(
   Path        = "/path/to/Sample_1/outs",
-  multiplexed = FALSE,
+  multi = FALSE,
   Treatment   = "Control"     # works here, and only here
 )
 ```
@@ -48,7 +48,7 @@ delimited string you then have to parse and validate.
 
 So the two tables stay separate, at their own grain:
 
-* **manifest** -- run-level: `Path`, `multiplexed`, and legitimately things
+* **manifest** -- run-level: `Path`, `multi`, and legitimately things
   like `Batch` or `RunDate` that really do apply to the whole run.
 * **sample sheet** -- sample-level: one row per sample, however many runs
   they came from.
@@ -63,7 +63,7 @@ way.
 ```{r workflow}
 seurat_list <- seuratFrom10x(
   path        = "/path/to/Pool1/outs",
-  multiplexed = TRUE
+  multi = TRUE
 )
 
 names(seurat_list)

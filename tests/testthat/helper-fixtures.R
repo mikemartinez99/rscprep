@@ -1,4 +1,4 @@
-# Test fixtures for preproSCessR.
+# Test fixtures for rscprep.
 #
 # Strategy: the package's real logic is *path resolution* -- deciding which H5
 # file to look for, what to name the resulting sample, and whether a missing
@@ -55,13 +55,20 @@ make_count_run <- function(root, sample = "Sample_1", h5 = TRUE) {
 }
 
 #' Create a `cellranger multi` layout:
-#'   <root>/<run>/outs/per_sample_outs/<sample>/sample_filtered_...h5
+#'   <root>/<run>/outs/per_sample_outs/<sample>/count/sample_filtered_...h5
+#'
+#' `where = "count"` is the real Cell Ranger layout. `where = "flat"` drops the
+#' H5 straight into the sample directory instead, which is what staging or
+#' flattening pipelines produce and what the fallback candidate exists for.
+#'
 #' `h5` may be a single logical or one logical per sample, so a run can be
 #' built with some samples' H5 files deliberately absent.
 #' Returns the `outs` directory path.
 make_multi_run <- function(root, run = "Pool1", samples = c("Sample_A", "Sample_B"),
-                           h5 = TRUE, make_per_sample_outs = TRUE) {
-    outs <- file.path(root, run, "outs")
+                           h5 = TRUE, make_per_sample_outs = TRUE,
+                           where = c("count", "flat")) {
+    where <- match.arg(where)
+    outs  <- file.path(root, run, "outs")
     dir.create(outs, recursive = TRUE, showWarnings = FALSE)
 
     if (make_per_sample_outs) {
@@ -70,12 +77,25 @@ make_multi_run <- function(root, run = "Pool1", samples = c("Sample_A", "Sample_
             sdir <- file.path(outs, "per_sample_outs", samples[i])
             dir.create(sdir, recursive = TRUE, showWarnings = FALSE)
             if (h5[i]) {
-                file.create(file.path(sdir, "sample_filtered_feature_bc_matrix.h5"))
+                file.create(sampleFilteredH5(sdir, where))
             }
         }
     }
 
     outs
+}
+
+#' Path of a demuxed sample's filtered H5 within its per_sample_outs directory.
+#'
+#' Creates the `count/` folder as a side effect when `where = "count"`, so
+#' callers can hand the result straight to file.create().
+sampleFilteredH5 <- function(sample_dir, where = c("count", "flat")) {
+    where <- match.arg(where)
+
+    dir <- if (where == "count") file.path(sample_dir, "count") else sample_dir
+    dir.create(dir, recursive = TRUE, showWarnings = FALSE)
+
+    file.path(dir, "sample_filtered_feature_bc_matrix.h5")
 }
 
 #' Add a raw feature barcode matrix to an existing `outs` directory.

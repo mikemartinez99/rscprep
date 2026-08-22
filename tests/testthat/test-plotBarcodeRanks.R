@@ -21,7 +21,7 @@ test_that("one run returns a curve, a plot and both cutoffs", {
     root <- local_root()
     outs <- local_rank_run(root)
 
-    res <- plotBarcodeRanks(path = outs, multiplexed = FALSE)
+    res <- plotBarcodeRanks(path = outs, multi = FALSE)
 
     expect_named(res, "Sample_1")
     expect_named(res$Sample_1,
@@ -40,7 +40,7 @@ test_that("the knee separates the cell population from the ambient tail", {
     outs <- local_rank_run(root, counts = make_raw_counts(n_cells = 300,
                                                           n_empty = 3000))
 
-    res <- plotBarcodeRanks(path = outs, multiplexed = FALSE)$Sample_1
+    res <- plotBarcodeRanks(path = outs, multi = FALSE)$Sample_1
 
     expect_equal(res$n_barcodes, 3300)
     # the cutoff should land near the 300 planted cells, not out in the tail
@@ -53,7 +53,7 @@ test_that("the returned curve is the plotted curve, not the full barcode table",
     root <- local_root()
     outs <- local_rank_run(root)
 
-    curve <- plotBarcodeRanks(path = outs, multiplexed = FALSE)$Sample_1$data
+    curve <- plotBarcodeRanks(path = outs, multi = FALSE)$Sample_1$data
 
     expect_named(curve, c("barcode", "rank", "total", "fitted"))
     # one row per distinct total, so far fewer rows than barcodes
@@ -69,10 +69,10 @@ test_that("`lower` is passed through to barcodeRanks()", {
     root <- local_root()
     outs <- local_rank_run(root)
 
-    default <- plotBarcodeRanks(path = outs, multiplexed = FALSE)$Sample_1
+    default <- plotBarcodeRanks(path = outs, multi = FALSE)$Sample_1
     # high enough to bite: this fixture's ambient tail all sits below 100, so a
     # modest bump would exclude nothing and change nothing
-    raised  <- plotBarcodeRanks(path = outs, multiplexed = FALSE,
+    raised  <- plotBarcodeRanks(path = outs, multi = FALSE,
                                 lower = 1000)$Sample_1
 
     # a different ambient assumption moves the fit, hence the cutoffs
@@ -87,8 +87,8 @@ test_that("extra arguments reach barcodeRanks()", {
     root <- local_root()
     outs <- local_rank_run(root)
 
-    default <- plotBarcodeRanks(path = outs, multiplexed = FALSE)$Sample_1
-    stiffer <- plotBarcodeRanks(path = outs, multiplexed = FALSE, df = 5)$Sample_1
+    default <- plotBarcodeRanks(path = outs, multi = FALSE)$Sample_1
+    stiffer <- plotBarcodeRanks(path = outs, multi = FALSE, df = 5)$Sample_1
 
     expect_false(isTRUE(all.equal(default$data$fitted, stiffer$data$fitted)))
 })
@@ -99,7 +99,7 @@ test_that("outdir writes one CSV and one PNG per run", {
     outs <- local_rank_run(root)
     dest <- file.path(root, "qc", "ranks")   # does not exist yet
 
-    res <- plotBarcodeRanks(path = outs, multiplexed = FALSE, outdir = dest,
+    res <- plotBarcodeRanks(path = outs, multi = FALSE, outdir = dest,
                             width = 5, height = 4, dpi = 72)
 
     expect_setequal(list.files(dest),
@@ -116,7 +116,7 @@ test_that("nothing is written when outdir is NULL", {
     outs <- local_rank_run(root)
     before <- list.files(root, recursive = TRUE)
 
-    plotBarcodeRanks(path = outs, multiplexed = FALSE)
+    plotBarcodeRanks(path = outs, multi = FALSE)
 
     expect_equal(list.files(root, recursive = TRUE), before)
 })
@@ -127,7 +127,7 @@ test_that("run names are sanitised for use as filenames", {
     outs <- local_rank_run(root, sample = "Pool 1/rerun")
     dest <- file.path(root, "out")
 
-    plotBarcodeRanks(path = outs, multiplexed = FALSE, outdir = dest)
+    plotBarcodeRanks(path = outs, multi = FALSE, outdir = dest)
 
     expect_setequal(list.files(dest),
                     c("rerun_barcode_ranks.csv", "rerun_barcode_ranks.png"))
@@ -139,11 +139,11 @@ test_that("a missing raw matrix is fatal in path mode and skipped in manifest mo
     present <- local_rank_run(root, "Sample_1")
     absent  <- make_count_run(root, "Sample_2")   # filtered only, no raw
 
-    expect_error(plotBarcodeRanks(path = absent, multiplexed = FALSE),
+    expect_error(plotBarcodeRanks(path = absent, multi = FALSE),
                  "Raw matrix for")
 
-    manifest <- data.frame(Path        = c(absent, present),
-                           multiplexed = c(FALSE, FALSE))
+    manifest <- data.frame(Path  = c(absent, present),
+                           multi = c(FALSE, FALSE))
     expect_warning(res <- plotBarcodeRanks(manifest = manifest), "Raw matrix for")
     expect_named(res, "Sample_1")
 })
@@ -161,7 +161,7 @@ test_that("a run barcodeRanks() cannot fit is skipped, not fatal, in manifest mo
 
     expect_warning(
         res <- plotBarcodeRanks(manifest = data.frame(Path = bad,
-                                                      multiplexed = FALSE)),
+                                                      multi = FALSE)),
         "barcode ranking failed"
     )
     expect_length(res, 0)
@@ -172,7 +172,7 @@ test_that("the plot is a plain ggplot with log-log axes and both cutoff lines", 
     root <- local_root()
     outs <- local_rank_run(root)
 
-    res <- plotBarcodeRanks(path = outs, multiplexed = FALSE)$Sample_1
+    res <- plotBarcodeRanks(path = outs, multi = FALSE)$Sample_1
     p   <- res$plot
 
     # points, fitted line, two dashed rules, two labels
@@ -193,11 +193,11 @@ test_that("argument validation matches seuratFrom10x()", {
 
     expect_error(plotBarcodeRanks(), "Provide either `manifest` or `path`")
     expect_error(plotBarcodeRanks(path = "/some/outs"),
-                 "you must also specify `multiplexed`")
+                 "you must also specify `multi`")
     expect_error(plotBarcodeRanks(manifest = data.frame(other = 1)),
-                 "missing required columns: Path and multiplexed")
-    expect_error(plotBarcodeRanks(path = "/x", multiplexed = FALSE, lower = -1),
+                 "missing required columns: Path and multi")
+    expect_error(plotBarcodeRanks(path = "/x", multi = FALSE, lower = -1),
                  "'lower' must be a single non-negative number")
-    expect_error(plotBarcodeRanks(path = "/x", multiplexed = FALSE, outdir = ""),
+    expect_error(plotBarcodeRanks(path = "/x", multi = FALSE, outdir = ""),
                  "'outdir' must be a single directory path")
 })

@@ -23,7 +23,7 @@ test_that("readOneSample10x builds an object from the expected file", {
 test_that("readOneSample10x honours the filename argument", {
     root  <- local_root()
     calls <- local_mock_read10x()
-    outs  <- make_multi_run(root, "Pool1", "Sample_A")
+    outs  <- make_multi_run(root, "Pool1", "Sample_A", where = "flat")
     sdir  <- file.path(outs, "per_sample_outs", "Sample_A")
 
     readOneSample10x(sdir, "Sample_A", 0, 0,
@@ -31,6 +31,34 @@ test_that("readOneSample10x honours the filename argument", {
 
     expect_equal(calls$files,
                  file.path(sdir, "sample_filtered_feature_bc_matrix.h5"))
+})
+
+test_that("readOneSample10x takes the first filename candidate that exists", {
+    # `filename` is a search order, not a single name: the same logical file
+    # sits in different places depending on which pipeline wrote it.
+    root  <- local_root()
+    calls <- local_mock_read10x()
+    outs  <- make_count_run(root, "Sample_1")
+
+    readOneSample10x(outs, "Sample_1", 0, 0,
+                     filename = c("nested/absent.h5",
+                                  "filtered_feature_bc_matrix.h5"))
+
+    expect_equal(calls$files, file.path(outs, "filtered_feature_bc_matrix.h5"))
+})
+
+test_that("readOneSample10x names every candidate it tried when none exist", {
+    root <- local_root()
+    local_mock_read10x()
+    outs <- make_count_run(root, "Sample_1", h5 = FALSE)
+
+    seen <- NULL
+    readOneSample10x(outs, "Sample_1", 0, 0,
+                     filename   = c("a.h5", "b.h5"),
+                     on_missing = function(m) seen <<- m)
+
+    expect_match(seen, "a.h5", fixed = TRUE)
+    expect_match(seen, "b.h5", fixed = TRUE)
 })
 
 test_that("Ident is independent of the directory name", {
@@ -95,10 +123,24 @@ test_that("readMultiplexedRun10x names entries after per_sample_outs dirs", {
     expect_true(all(res$Sample_A$Ident == "Sample_A"))
 })
 
-test_that("readMultiplexedRun10x reads the per-sample filename", {
+test_that("readMultiplexedRun10x reads from each sample's count/ folder", {
+    # The real `cellranger multi` layout: the filtered H5 sits one level below
+    # the sample directory, alongside the BAM and the analysis outputs.
     root  <- local_root()
     calls <- local_mock_read10x()
     outs  <- make_multi_run(root, "Pool1", "Sample_A")
+
+    readMultiplexedRun10x(outs, 0, 0)
+
+    expect_equal(calls$files,
+                 file.path(outs, "per_sample_outs", "Sample_A", "count",
+                           "sample_filtered_feature_bc_matrix.h5"))
+})
+
+test_that("readMultiplexedRun10x falls back to a flattened per-sample H5", {
+    root  <- local_root()
+    calls <- local_mock_read10x()
+    outs  <- make_multi_run(root, "Pool1", "Sample_A", where = "flat")
 
     readMultiplexedRun10x(outs, 0, 0)
 
@@ -138,14 +180,33 @@ test_that("readMultiplexedRun10x propagates on_missing to each sample", {
     )
 })
 
-test_that("readMultiplexedRun10x returns an empty named list when there are no samples", {
+test_that("readMultiplexedRun10x routes an absent per_sample_outs through on_missing", {
+    # Otherwise the whole run vanishes silently: list.dirs() returns
+    # character(0) for a directory that is not there.
     root <- local_root()
     local_mock_read10x()
     outs <- make_multi_run(root, "Pool1", make_per_sample_outs = FALSE)
 
-    res <- readMultiplexedRun10x(outs, 0, 0)
-
+    expect_warning(res <- readMultiplexedRun10x(outs, 0, 0),
+                   "No demuxed sample directories found")
     expect_type(res, "list")
+    expect_length(res, 0)
+
+    expect_error(
+        readMultiplexedRun10x(outs, 0, 0,
+                              on_missing = function(m) stop(m, call. = FALSE)),
+        "No demuxed sample directories found"
+    )
+})
+
+test_that("readMultiplexedRun10x treats an empty per_sample_outs the same way", {
+    root <- local_root()
+    local_mock_read10x()
+    outs <- make_multi_run(root, "Pool1", make_per_sample_outs = FALSE)
+    dir.create(file.path(outs, "per_sample_outs"))
+
+    expect_warning(res <- readMultiplexedRun10x(outs, 0, 0),
+                   "No demuxed sample directories found")
     expect_length(res, 0)
 })
 
@@ -154,6 +215,7 @@ test_that("readMultiplexedRun10x ignores files sitting in per_sample_outs", {
     local_mock_read10x()
     outs <- make_multi_run(root, "Pool1", "Sample_A")
     file.create(file.path(outs, "per_sample_outs", "metrics_summary.csv"))
+
 
     res <- readMultiplexedRun10x(outs, 0, 0)
 

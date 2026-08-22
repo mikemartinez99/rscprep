@@ -7,6 +7,6 @@
 # * https://testthat.r-lib.org/articles/special-files.html
 
 library(testthat)
-library(preproSCessR)
+library(rscprep)
 
-test_check("preproSCessR")
+test_check("rscprep")
