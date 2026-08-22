@@ -1,3 +1,9 @@
-^scPrepR\.Rproj$
+^rscprep\.Rproj$
 ^\.Rproj\.user$
 ^scratch$
+^CLAUDE\.md$
+^doc$
+^Meta$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
