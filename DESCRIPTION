@@ -1,22 +1,35 @@
-Package: scPrepR
-Title: What the Package Does (One Line, Title Case)
+Package: rscprep
+Title: Prepare Single-Cell RNA-Seq Data for Analysis
 Version: 0.0.0.9000
 Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+    person("Mike", "Martinez", , "mike.j.martinez99@gmail.com", role = c("aut", "cre"))
+Description: Reads Cell Ranger output into Seurat objects, annotates them
+    with sample-level metadata, and calculates the per-cell quality control
+    metrics that filtering decisions are made from. Handles both the
+    'cellranger count' and 'cellranger multi' output layouts behind one
+    interface, flags outlier cells by median absolute deviation either
+    globally or within sample, and records the thresholds it applied so that
+    what was removed, and why, stays inspectable afterwards.
+License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.3
 Imports:
     cli,
+    ggplot2,
+    grid,
     methods,
-    Seurat
+    Seurat,
+    stats,
+    utils
 Suggests:
+    dittoSeq,
+    DropletUtils,
     knitr,
     Matrix,
+    orthogene,
     rmarkdown,
+    S4Vectors,
     testthat (>= 3.0.0),
     withr
 VignetteBuilder: knitr

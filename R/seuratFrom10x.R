@@ -95,7 +95,7 @@ seuratFrom10x <- function(manifest = NULL, path = NULL, multi = NULL,
             ident <- identFromOutsDir(path)
             seurat <- readOneSample10x(path, ident, min.cells, min.features,
                                         on_missing = fatal)
-            seurat_list <- setNames(list(seurat), ident)
+            seurat_list <- stats::setNames(list(seurat), ident)
         }
         cli::cli_alert_success("Loaded {length(seurat_list)} sample{?s}.")
         return(seurat_list)
@@ -107,7 +107,7 @@ seuratFrom10x <- function(manifest = NULL, path = NULL, multi = NULL,
             readMultiplexedRun10x(outs_dir, min.cells, min.features)
         } else {
             ident <- identFromOutsDir(outs_dir)
-            setNames(list(readOneSample10x(outs_dir, ident, min.cells, min.features)), ident)
+            stats::setNames(list(readOneSample10x(outs_dir, ident, min.cells, min.features)), ident)
         }
     })
 

@@ -278,14 +278,16 @@ make_fake_seurat <- function() {
 #'
 #' Defaults are mouse-style symbols (`mt-`, `Rp[sl]`). Pass human-style names
 #' to exercise a different organism, or `character(0)` to build an object a
-#' pattern cannot match at all.
+#' pattern cannot match at all. `extra` adds further named genes -- cell cycle
+#' markers, say -- alongside the anonymous background.
 make_pattern_seurat <- function(mito    = c("mt-Co1", "mt-Co2", "mt-Nd1"),
                                 ribo    = c("Rps3", "Rpl4"),
                                 n_other = 15,
                                 n_cells = 20,
                                 ident   = "Sample_A",
-                                assay   = "RNA") {
-    genes <- c(mito, ribo, paste0("Gene", seq_len(n_other)))
+                                assay   = "RNA",
+                                extra   = character(0)) {
+    genes <- c(mito, ribo, extra, paste0("Gene", seq_len(n_other)))
     cells <- paste0("Cell", seq_len(n_cells))
 
     m <- matrix(1, nrow = length(genes), ncol = n_cells,
@@ -349,3 +351,78 @@ log_metric_values <- function(extreme = NULL) {
 
 #' The MAD constant stats::mad() scales by.
 MAD_CONST <- 1.4826
+
+# ---- cell cycle fixtures -------------------------------------------------
+#
+# Seurat::CellCycleScoring() bins genes by expression and samples 100 control
+# genes per bin, so it needs a background pool of at least ~1,200 genes before
+# it will run at all -- below that it fails with "cannot take a sample larger
+# than the population", which is the error runCellCycle() wraps. The fixture
+# is sized just above that floor and kept narrow in cells to stay quick.
+
+#' A Seurat object the cell cycle markers can actually be scored against.
+#'
+#' `markers` supplies the marker symbols to embed; the default is the human
+#' set Seurat ships, so `organism = "hsa"` scores without any ortholog
+#' conversion. Pass converted symbols to build a non-human object, or a subset
+#' to exercise the few-markers-matched path.
+#'
+#' `normalise = FALSE` returns raw counts, which is what the
+#' normalise-on-the-way-through behaviour is tested against.
+make_cellcycle_seurat <- function(markers   = c(Seurat::cc.genes$s.genes,
+                                                Seurat::cc.genes$g2m.genes),
+                                  n_cells   = 40,
+                                  n_bg      = 1200,
+                                  normalise = TRUE,
+                                  seed      = 42) {
+    genes <- c(markers, paste0("BG", seq_len(n_bg)))
+
+    m <- withr::with_seed(seed, {
+        matrix(stats::rpois(length(genes) * n_cells, 5),
+               nrow     = length(genes),
+               dimnames = list(genes, paste0("Cell", seq_len(n_cells))))
+    })
+
+    obj <- Seurat::CreateSeuratObject(Matrix::Matrix(m, sparse = TRUE),
+                                      min.cells = 0, min.features = 0)
+    if (normalise) obj <- Seurat::NormalizeData(obj, verbose = FALSE)
+    obj
+}
+
+#' Mock orthogene::convert_orthologs() for the duration of the calling test.
+#'
+#' Maps every input symbol to a predictable pseudo-ortholog (`MCM5` becomes
+#' `Xmcm5`) so the conversion is deterministic and offline. `drop` names input
+#' symbols to omit from the result, standing in for genes with no one-to-one
+#' ortholog -- which is what makes the output a different length and order
+#' from the input, and therefore what the match-by-symbol logic is for.
+#'
+#' Returns an environment whose `$calls` field records each `gene_df` handed
+#' over, so a test can assert both sets were converted in a single request.
+local_mock_orthologs <- function(drop = character(0), shuffle = TRUE,
+                                 .env = parent.frame()) {
+    calls <- new.env(parent = emptyenv())
+    calls$gene_df <- list()
+    calls$output_species <- character(0)
+
+    testthat::local_mocked_bindings(
+        convert_orthologs = function(gene_df, output_species, ...) {
+            calls$gene_df <- c(calls$gene_df, list(gene_df))
+            calls$output_species <- c(calls$output_species, output_species)
+
+            kept <- setdiff(gene_df, drop)
+            if (shuffle) kept <- rev(kept)   # order must not be relied on
+
+            data.frame(input_gene    = kept,
+                       ortholog_gene = paste0("X", tolower(kept)),
+                       stringsAsFactors = FALSE)
+        },
+        .package = "orthogene",
+        .env     = .env
+    )
+
+    calls
+}
+
+#' The pseudo-ortholog symbol local_mock_orthologs() maps a human symbol to.
+pseudo_ortholog <- function(x) paste0("X", tolower(x))
