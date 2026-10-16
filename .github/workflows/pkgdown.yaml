@@ -32,14 +32,13 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          # Imports plus only the Suggests the vignettes actually run: hdf5r
-          # to read the bundled H5 files, DropletUtils/S4Vectors for
-          # plotBarcodeRanks(). dittoSeq and orthogene are never loaded by the
-          # site, and installing all Suggests adds ~15 minutes to a cold run.
+          # Imports only: every vignette is eval = FALSE and every example
+          # needing a Suggests package is \dontrun{}, so the site never loads
+          # DropletUtils, dittoSeq or orthogene. Installing all Suggests adds
+          # ~15 minutes to a cold run. Add a package back here if a vignette
+          # starts running code that needs it.
           dependencies: '"hard"'
-          extra-packages: >-
-            any::pkgdown, any::knitr, any::rmarkdown, any::hdf5r,
-            any::Matrix, any::DropletUtils, any::S4Vectors, local::.
+          extra-packages: any::pkgdown, any::knitr, any::rmarkdown, local::.
           needs: website
 
       - name: Build site

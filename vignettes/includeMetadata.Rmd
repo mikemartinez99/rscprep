@@ -10,11 +10,13 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment  = "#>"
+  comment  = "#>",
+  eval     = FALSE  # paths below are illustrative, not real -- flip to TRUE
+                     # once this vignette points at a bundled example dataset
 )
 ```
 
-```{r setup, message = FALSE}
+```{r setup}
 library(rscprep)
 library(Seurat)
 ```
@@ -24,15 +26,6 @@ compare -- have to get attached to the objects somewhere. `includeMetadata()`
 does that from a sample-level table, keyed on the names of the list
 `seuratFrom10x()` returns.
 
-```{r, child = "_heart1k.Rmd"}
-```
-
-```{r, child = "_pseudo-samples.Rmd"}
-```
-
-The treatment labels below are invented for the example. All three
-pseudo-samples are the same heart.
-
 ## Why not just put it in the manifest?
 
 Because the manifest is a different kind of table. Its rows are Cell Ranger
@@ -40,7 +33,7 @@ Because the manifest is a different kind of table. Its rows are Cell Ranger
 For a plain `cellranger count` run those happen to coincide, so it is tempting
 to add a `Treatment` column and be done:
 
-```{r tempting, eval = FALSE}
+```{r tempting}
 manifest <- data.frame(
   Path        = "/path/to/Sample_1/outs",
   multi = FALSE,
@@ -67,30 +60,34 @@ way.
 
 ## The workflow
 
-Start from the list and read its names:
-
 ```{r workflow}
+seurat_list <- seuratFrom10x(
+  path        = "/path/to/Pool1/outs",
+  multi = TRUE
+)
+
 names(seurat_list)
+#> [1] "Bleo_18_Slim_10" "Bleo_22_Slim_14" "Ctrl_04_Slim_02" "Ctrl_09_Slim_07"
 ```
 
-For a `cellranger multi` run those are the folder names under
-`per_sample_outs/`. Those names are what you key on. Write a sheet against
-them:
+Those names are what you key on. Write a sheet against them:
 
 ```{r sheet}
 sheet <- data.frame(
-  Sample    = c("Sample_A", "Sample_B", "Sample_C"),
-  Treatment = c("Control", "Bleomycin", "Bleomycin"),
-  Timepoint = c("D21", "D21", "D21")
+  Sample    = c("Bleo_18_Slim_10", "Bleo_22_Slim_14",
+                "Ctrl_04_Slim_02", "Ctrl_09_Slim_07"),
+  Treatment = c("Bleomycin", "Bleomycin", "Control", "Control"),
+  Timepoint = c("D21", "D21", "D21", "D21")
 )
 
 annotated <- includeMetadata(seurat_list, sheet)
+#> ✔ Added 2 metadata columns to 4 objects: "Treatment" and "Timepoint"
 ```
 
 In practice the sheet lives in a CSV next to your analysis, filled in by
 whoever ran the experiment and kept under version control:
 
-```{r csv, eval = FALSE}
+```{r csv}
 sheet     <- read.csv("samplesheet.csv")
 annotated <- includeMetadata(seurat_list, sheet)
 ```
@@ -114,8 +111,8 @@ A `Sample` column is the primary key because it survives a CSV round trip.
 Rownames work too, and are used whenever there is no `Sample` column:
 
 ```{r rownames}
-sheet <- data.frame(Treatment = c("Control", "Bleomycin", "Bleomycin"))
-rownames(sheet) <- c("Sample_A", "Sample_B", "Sample_C")
+sheet <- data.frame(Treatment = c("Control", "Bleomycin"))
+rownames(sheet) <- c("Sample_A", "Sample_B")
 
 annotated <- includeMetadata(seurat_list, sheet)
 ```
@@ -131,7 +128,7 @@ The rule `includeMetadata()` enforces is that a column, once present, is
 populated for **all** samples. A sample with no row is an error. So is an `NA`,
 an empty cell, or a whitespace-only cell:
 
-```{r incomplete, error = TRUE}
+```{r incomplete}
 sheet <- data.frame(
   Sample    = c("Sample_A", "Sample_B", "Sample_C"),
   Treatment = c("Control", NA, "Bleomycin"),
@@ -139,6 +136,12 @@ sheet <- data.frame(
 )
 
 includeMetadata(seurat_list, sheet)
+#> Error:
+#> Every column of `metadata` must be populated for every sample.
+#> ✖ Treatment: missing for "Sample_B"
+#> ✖ Timepoint: missing for "Sample_A" and "Sample_C"
+#> ℹ A column left blank for some samples becomes `NA` for their cells after
+#>   `mergeSeurat()`.
 ```
 
 Every offending column is reported at once, so a forty-sample sheet gets fixed
@@ -156,6 +159,8 @@ annotated$Treatment <- "Control"
 merged <- merge(annotated, unannotated, add.cell.id = c("Sample_A", "Sample_B"))
 
 table(merged$Treatment, useNA = "ifany")
+#> Control    <NA>
+#>    4821    5104
 ```
 
 Those `NA` cells then quietly drop out of every grouped comparison downstream.
@@ -168,13 +173,10 @@ Rows that match no loaded object are ignored with a warning, so one sheet can
 describe a whole experiment while you work on a subset:
 
 ```{r master}
-# the sheet describes five samples; only three are loaded
-master_sheet <- data.frame(
-  Sample    = c("Sample_A", "Sample_B", "Sample_C", "Sample_D", "Sample_E"),
-  Treatment = c("Control", "Bleomycin", "Bleomycin", "Control", "Bleomycin")
-)
-
+# sheet covers all 40 samples; only Pool1's 4 are loaded
 annotated <- includeMetadata(seurat_list, master_sheet)
+#> ! Ignoring 36 rows of `metadata` matching no object in `objList`: ...
+#> ✔ Added 2 metadata columns to 4 objects: "Treatment" and "Timepoint"
 ```
 
 A typo is still caught, because a mistyped name in the sheet leaves some
@@ -185,13 +187,8 @@ object without a row -- and that is a hard error, not a warning.
 **Existing columns are protected.** Re-running against an edited sheet errors
 unless you opt in:
 
-```{r overwrite, error = TRUE}
-corrected_sheet <- master_sheet
-corrected_sheet$Treatment[2] <- "Control"
-
-includeMetadata(annotated, corrected_sheet)
-
-annotated <- includeMetadata(annotated, corrected_sheet, overwrite = TRUE)
+```{r overwrite}
+includeMetadata(annotated, corrected_sheet, overwrite = TRUE)
 ```
 
 `Ident` is reserved and cannot be set at all, even with `overwrite = TRUE` --

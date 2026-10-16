@@ -10,11 +10,13 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment  = "#>"
+  comment  = "#>",
+  eval     = FALSE  # paths below are illustrative, not real -- flip to TRUE
+                     # once this vignette points at a bundled example dataset
 )
 ```
 
-```{r setup, message = FALSE}
+```{r setup}
 library(rscprep)
 library(Seurat)
 ```
@@ -34,40 +36,24 @@ which *pipeline* wrote the directory -- not whether samples were pooled. See
 "Choosing `multi`" below if the run came off `cellranger multi` with a single
 sample in it, which is the usual shape for Flex and 5'.
 
-```{r, child = "_heart1k.Rmd"}
-```
-
 ## A `cellranger count` run
 
 ```{r single-sample}
 seurat_list <- seuratFrom10x(
-  path  = outs,
+  path  = "/path/to/Sample_1/outs",
   multi = FALSE
 )
 
-seurat_list$heart_1k_v3
+seurat_list$Sample_1
 ```
 
 `path` should point to the Cell Ranger `outs/` directory -- the function
 looks for `filtered_feature_bc_matrix.h5` directly inside it. The sample name
-is inferred from the parent folder (`heart_1k_v3`, one level up from `outs`).
-
-That object has 957 cells, not the 1,011 in `heart1k`. The defaults
-`min.cells = 10` and `min.features = 50` are passed to
-`Seurat::CreateSeuratObject()`, and with only ~2,000 genes in the bundled
-matrix, 54 cells fall under 50 detected genes. `heart1k` was built with both
-set to 0 so it keeps every cell Cell Ranger called:
-
-```{r no-filters}
-seuratFrom10x(path = outs, multi = FALSE, min.cells = 0, min.features = 0)
-```
+is inferred from the parent folder (`Sample_1`, one level up from `outs`).
 
 ## A `cellranger multi` run
 
-The bundled data comes from `cellranger count`, so the next two examples use
-placeholder paths and are not run.
-
-```{r multi-run, eval = FALSE}
+```{r multi-run}
 seurat_list <- seuratFrom10x(
   path  = "/path/to/Pool1/outs",
   multi = TRUE
@@ -85,7 +71,7 @@ list, not a single object.
 
 ## A batch of runs via manifest
 
-```{r manifest-batch, eval = FALSE}
+```{r manifest-batch}
 manifest <- data.frame(
   Path = c(
     "/path/to/Sample_1/outs",
@@ -132,4 +118,6 @@ warns.
 `min.cells` and `min.features` are passed straight through to
 `Seurat::CreateSeuratObject()` and apply uniformly across every sample in a
 batch -- set them once at the level of granularity you actually want, not
-per-sample.
+per-sample. The function forces classic (v4-style) Seurat assay objects
+internally regardless of which Seurat package version is installed, so
+results are consistent even in mixed-Seurat-version environments.
