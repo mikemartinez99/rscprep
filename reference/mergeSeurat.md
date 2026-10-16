@@ -12,7 +12,7 @@ to their sample of origin.
 ## Usage
 
 ``` r
-mergeSeurat(objList)
+mergeSeurat(objList, joinLayers = TRUE)
 ```
 
 ## Arguments
@@ -24,6 +24,13 @@ mergeSeurat(objList)
   objects, one per sample, as returned by
   [`seuratFrom10x()`](https://mikemartinez99.github.io/rscprep/reference/seuratFrom10x.md).
   Names are used as cell barcode prefixes and must be unique.
+
+- joinLayers:
+
+  Under Seurat 5, join the per-sample layers
+  [`merge()`](https://rdrr.io/r/base/merge.html) creates back into one
+  per kind of data. Defaults to `TRUE`. Ignored under Seurat 4, which
+  never splits them. See *Seurat 4 and Seurat 5*.
 
 ## Value
 
@@ -54,6 +61,10 @@ specific message instead of partway through the merge. In order,
 
 - contain no zero-cell objects;
 
+- carry an `Ident` metadata column, which
+  [`seuratFrom10x()`](https://mikemartinez99.github.io/rscprep/reference/seuratFrom10x.md)
+  sets to the sample name;
+
 - agree on
   [`Seurat::DefaultAssay()`](https://satijalab.org/seurat/reference/reexports.html)
   across every element.
@@ -61,10 +72,18 @@ specific message instead of partway through the merge. In order,
 Two further checks run *after* the merge, guarding against a merge that
 silently loses data: every sample must still be represented in the
 merged `Ident` metadata column, and the merged cell count must equal the
-sum of the inputs'. The first of these relies on each input object
-carrying an `Ident` column, which
-[`seuratFrom10x()`](https://mikemartinez99.github.io/rscprep/reference/seuratFrom10x.md)
-sets to the sample name.
+sum of the inputs'.
+
+## Seurat 4 and Seurat 5
+
+The installed version is detected automatically. Under Seurat 4,
+[`merge()`](https://rdrr.io/r/base/merge.html) binds every sample's
+counts into one matrix. Under Seurat 5 it keeps one layer per sample
+(`counts.Sample_A`, `counts.Sample_B`, ...), which is what Seurat 5's
+`IntegrateLayers()` wants but not what most other code expects. By
+default those layers are joined, so the merged object has the same shape
+whichever version made it. Set `joinLayers = FALSE` to keep them split;
+under Seurat 4 the argument has no effect.
 
 ## See also
 

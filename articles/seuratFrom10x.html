@@ -88,25 +88,80 @@ whether samples were pooled. See “Choosing <code>multi</code>” below if
 the run came off <code>cellranger multi</code> with a single sample in
 it, which is the usual shape for Flex and 5’.</p>
 <div class="section level2">
+<h2 id="the-example-data">The example data<a class="anchor" aria-label="anchor" href="#the-example-data"></a>
+</h2>
+<p>Every example in this vignette runs on data bundled with rscprep: a
+cut-down copy of the 10x Genomics demo run <a href="https://www.10xgenomics.com/datasets/1-k-heart-cells-from-an-e-18-mouse-v-3-chemistry-3-standard-3-0-0" class="external-link">1k
+Heart Cells from an E18 Mouse (v3 chemistry)</a>. It is one sample from
+one <code>cellranger count</code> run (Cell Ranger 3.0.0, mm10
+reference), with all 1,011 cells Cell Ranger called.</p>
+<p>It comes in two forms, holding the same data:</p>
+<ul>
+<li>
+<strong><code>heart1k</code></strong> – a Seurat object, for
+examples that start after loading.</li>
+<li>
+<strong>A Cell Ranger <code>outs/</code> directory</strong> – for
+the functions that take a path. It holds
+<code>filtered_feature_bc_matrix.h5</code> (the called cells) and
+<code>raw_feature_bc_matrix.h5</code> (every barcode that had at least
+25 UMIs in the original run, empty droplets included):</li>
+</ul>
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">outs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"heart_1k_v3"</span>, <span class="st">"outs"</span>, package <span class="op">=</span> <span class="st">"rscprep"</span><span class="op">)</span></span></code></pre></div>
+<p>To keep the package small, only 2,092 of the 31,053 genes are kept:
+the 2,000 detected in the most cells, plus every mitochondrial,
+ribosomal protein and cell-cycle gene. Each cell therefore keeps about
+70% of its UMIs, and percentages such as <code>pctMito</code> read
+higher than they would on the full gene set. That is fine for showing
+how the functions behave and wrong for drawing conclusions about heart
+tissue. <code><a href="../reference/heart1k.html">?heart1k</a></code> has the details, and
+<code>data-raw/heart_1k_v3.R</code> in the package source rebuilds it
+from the 10x download.</p>
+</div>
+<div class="section level2">
 <h2 id="a-cellranger-count-run">A <code>cellranger count</code> run<a class="anchor" aria-label="anchor" href="#a-cellranger-count-run"></a>
 </h2>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span></span>
-<span>  path  <span class="op">=</span> <span class="st">"/path/to/Sample_1/outs"</span>,</span>
+<span>  path  <span class="op">=</span> <span class="va">outs</span>,</span>
 <span>  multi <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: 957 cells, 2089 features.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Loaded 1 sample.</span></span>
 <span></span>
-<span><span class="va">seurat_list</span><span class="op">$</span><span class="va">Sample_1</span></span></code></pre></div>
+<span><span class="va">seurat_list</span><span class="op">$</span><span class="va">heart_1k_v3</span></span>
+<span><span class="co">#&gt; An object of class Seurat </span></span>
+<span><span class="co">#&gt; 2089 features across 957 samples within 1 assay </span></span>
+<span><span class="co">#&gt; Active assay: RNA (2089 features, 0 variable features)</span></span>
+<span><span class="co">#&gt;  1 layer present: counts</span></span></code></pre></div>
 <p><code>path</code> should point to the Cell Ranger <code>outs/</code>
 directory – the function looks for
 <code>filtered_feature_bc_matrix.h5</code> directly inside it. The
-sample name is inferred from the parent folder (<code>Sample_1</code>,
-one level up from <code>outs</code>).</p>
+sample name is inferred from the parent folder
+(<code>heart_1k_v3</code>, one level up from <code>outs</code>).</p>
+<p>That object has 957 cells, not the 1,011 in <code>heart1k</code>. The
+defaults <code>min.cells = 10</code> and <code>min.features = 50</code>
+are passed to <code><a href="https://satijalab.github.io/seurat-object/reference/CreateSeuratObject.html" class="external-link">Seurat::CreateSeuratObject()</a></code>, and with only
+~2,000 genes in the bundled matrix, 54 cells fall under 50 detected
+genes. <code>heart1k</code> was built with both set to 0 so it keeps
+every cell Cell Ranger called:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span>path <span class="op">=</span> <span class="va">outs</span>, multi <span class="op">=</span> <span class="cn">FALSE</span>, min.cells <span class="op">=</span> <span class="fl">0</span>, min.features <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: 1011 cells, 2092 features.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Loaded 1 sample.</span></span>
+<span><span class="co">#&gt; $heart_1k_v3</span></span>
+<span><span class="co">#&gt; An object of class Seurat </span></span>
+<span><span class="co">#&gt; 2092 features across 1011 samples within 1 assay </span></span>
+<span><span class="co">#&gt; Active assay: RNA (2092 features, 0 variable features)</span></span>
+<span><span class="co">#&gt;  1 layer present: counts</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="a-cellranger-multi-run">A <code>cellranger multi</code> run<a class="anchor" aria-label="anchor" href="#a-cellranger-multi-run"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<p>The bundled data comes from <code>cellranger count</code>, so the
+next two examples use placeholder paths and are not run.</p>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span></span>
 <span>  path  <span class="op">=</span> <span class="st">"/path/to/Pool1/outs"</span>,</span>
 <span>  multi <span class="op">=</span> <span class="cn">TRUE</span></span>
@@ -125,7 +180,7 @@ here returns a list, not a single object.</p>
 <div class="section level2">
 <h2 id="a-batch-of-runs-via-manifest">A batch of runs via manifest<a class="anchor" aria-label="anchor" href="#a-batch-of-runs-via-manifest"></a>
 </h2>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">manifest</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  Path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>    <span class="st">"/path/to/Sample_1/outs"</span>,</span>
@@ -191,10 +246,7 @@ name still works and warns.</p>
 <p><code>min.cells</code> and <code>min.features</code> are passed
 straight through to <code><a href="https://satijalab.github.io/seurat-object/reference/CreateSeuratObject.html" class="external-link">Seurat::CreateSeuratObject()</a></code> and apply
 uniformly across every sample in a batch – set them once at the level of
-granularity you actually want, not per-sample. The function forces
-classic (v4-style) Seurat assay objects internally regardless of which
-Seurat package version is installed, so results are consistent even in
-mixed-Seurat-version environments.</p>
+granularity you actually want, not per-sample.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

@@ -1,10 +1,11 @@
 # Barcode Rank ("Knee") Plots from Raw 10x Matrices
 
 Draws the standard barcode rank plot for one or more Cell Ranger runs:
-total UMI count against barcode rank on log-log axes, with the fitted
-spline and the knee and inflection points
+total UMI count against barcode rank on log-log axes, with the knee and
+inflection points
 [`DropletUtils::barcodeRanks()`](https://rdrr.io/pkg/DropletUtils/man/barcodeRanks.html)
-identifies. Takes the same `manifest` / `path` / `multi` arguments as
+identifies (and, with older DropletUtils, the spline it fitted to find
+them). Takes the same `manifest` / `path` / `multi` arguments as
 [`seuratFrom10x()`](https://mikemartinez99.github.io/rscprep/reference/seuratFrom10x.md),
 and returns both the plotted curve and the figure for every run.
 
@@ -48,9 +49,8 @@ plotBarcodeRanks(
 - lower:
 
   Total UMI count at or below which a barcode is assumed to be empty.
-  Used by
   [`DropletUtils::barcodeRanks()`](https://rdrr.io/pkg/DropletUtils/man/barcodeRanks.html)
-  to estimate the ambient profile and to bound the spline fit; it does
+  only looks above it when finding the knee and inflection; it does
   **not** filter the curve, and barcodes below it are still plotted.
   Default `100`.
 
@@ -71,7 +71,8 @@ plotBarcodeRanks(
 
   Further arguments to
   [`DropletUtils::barcodeRanks()`](https://rdrr.io/pkg/DropletUtils/man/barcodeRanks.html),
-  such as `fit.bounds`, `exclude.from` or `df`.
+  such as `exclude.from`. Which others it accepts depends on the
+  DropletUtils version – see *DropletUtils versions*.
 
 - multiplexed:
 
@@ -85,10 +86,12 @@ A named list with one element per run, each a list of:
 - `data`:
 
   Data frame of the plotted curve: `barcode`, `rank`, `total` and
-  `fitted`, one row per distinct total, ordered by rank. Zero-count
-  barcodes are dropped (they have no place on a log axis) and ties are
-  collapsed to one row, so this is far smaller than the raw matrix –
-  small enough to write to CSV, which the full per-barcode table is not.
+  `fitted`, one row per distinct total, ordered by rank. `fitted` is
+  `NA` throughout with DropletUtils 1.30 or later, which fits no spline.
+  Zero-count barcodes are dropped (they have no place on a log axis) and
+  ties are collapsed to one row, so this is far smaller than the raw
+  matrix – small enough to write to CSV, which the full per-barcode
+  table is not.
 
 - `plot`:
 
@@ -138,9 +141,11 @@ from that run should be treated with suspicion.
 
 - Fitted line:
 
-  The smooth spline `barcodeRanks()` fits to the curve; the knee and
-  inflection are derived from its derivatives. Undefined below `lower`,
-  so it stops short of the right-hand tail.
+  DropletUtils before 1.30 only: the smooth spline `barcodeRanks()` fits
+  to the curve, whose derivatives give the knee and inflection.
+  Undefined below `lower`, so it stops short of the right-hand tail.
+  From 1.30, `barcodeRanks()` traces the curve directly and fits no
+  spline, so no line is drawn – see *DropletUtils versions*.
 
 - Knee:
 
@@ -167,6 +172,18 @@ by the size of the manifest.
 [`rawMatrixFrom10x()`](https://mikemartinez99.github.io/rscprep/reference/rawMatrixFrom10x.md)
 is the function to reach for if you genuinely need the matrices
 themselves, and it makes no such promise.
+
+## DropletUtils versions
+
+The installed DropletUtils is detected from what `barcodeRanks()`
+returns. Its method for finding the knee changed twice. Before 1.28 it
+fitted a smoothing spline and took derivatives; 1.28 switched to the
+point farthest from a line between plateau and inflection; 1.30 replaced
+both with a curve-tracing algorithm and stopped returning the spline. So
+the knee, and sometimes the inflection, can move between versions on the
+same data, and `data$fitted` is `NA` from 1.30 on. The arguments
+`fit.bounds` and `df` only do anything before 1.30; from 1.30 the ones
+that tune the fit are `exclude.from`, `window` and `gradient.threshold`.
 
 ## See also
 

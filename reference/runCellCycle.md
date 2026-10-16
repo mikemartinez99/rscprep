@@ -94,6 +94,13 @@ Normalise beforehand if you want anything other than the defaults; the
 check is a heuristic (log-normalised values are essentially never whole
 numbers), so an already-normalised object is left exactly as it was.
 
+The installed Seurat version is detected automatically. Seurat 4 copies
+the counts into the data slot when an object is created, so the
+heuristic reads that copy. A Seurat 5 object has no data layer until it
+is normalised, so its absence alone means raw. Seurat 5 objects whose
+layers are still split by sample after a merge are read across every
+layer.
+
 ## Non-human organisms
 
 Markers are converted with

@@ -60,7 +60,7 @@ back to their sample of origin.</p>
 
     <div class="section level2">
     <h2 id="ref-usage">Usage<a class="anchor" aria-label="anchor" href="#ref-usage"></a></h2>
-    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">mergeSeurat</span><span class="op">(</span><span class="va">objList</span><span class="op">)</span></span></code></pre></div>
+    <div class="sourceCode"><pre class="sourceCode r"><code><span><span class="fu">mergeSeurat</span><span class="op">(</span><span class="va">objList</span>, joinLayers <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
     </div>
 
     <div class="section level2">
@@ -71,6 +71,12 @@ back to their sample of origin.</p>
 <dd><p>Named list of <a href="https://satijalab.org/seurat/reference/reexports.html" class="external-link">Seurat</a> objects,
 one per sample, as returned by <code><a href="seuratFrom10x.html">seuratFrom10x()</a></code>. Names are used as cell
 barcode prefixes and must be unique.</p></dd>
+
+
+<dt id="arg-joinlayers">joinLayers<a class="anchor" aria-label="anchor" href="#arg-joinlayers"></a></dt>
+<dd><p>Under Seurat 5, join the per-sample layers <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>
+creates back into one per kind of data. Defaults to <code>TRUE</code>. Ignored under
+Seurat 4, which never splits them. See <em>Seurat 4 and Seurat 5</em>.</p></dd>
 
 </dl></div>
     <div class="section level2">
@@ -93,12 +99,25 @@ must:</p><ul><li><p>be non-empty (a single-element list short-circuits – see <
 <li><p>contain only structurally valid Seurat objects;</p></li>
 <li><p>be fully named, with no <code>NA</code>, blank or duplicated names;</p></li>
 <li><p>contain no zero-cell objects;</p></li>
+<li><p>carry an <code>Ident</code> metadata column, which <code><a href="seuratFrom10x.html">seuratFrom10x()</a></code> sets to the
+sample name;</p></li>
 <li><p>agree on <code><a href="https://satijalab.org/seurat/reference/reexports.html" class="external-link">Seurat::DefaultAssay()</a></code> across every element.</p></li>
 </ul><p>Two further checks run <em>after</em> the merge, guarding against a merge that
 silently loses data: every sample must still be represented in the merged
 <code>Ident</code> metadata column, and the merged cell count must equal the sum of
-the inputs'. The first of these relies on each input object carrying an
-<code>Ident</code> column, which <code><a href="seuratFrom10x.html">seuratFrom10x()</a></code> sets to the sample name.</p>
+the inputs'.</p>
+    </div>
+    <div class="section level2">
+    <h2 id="seurat-and-seurat-">Seurat 4 and Seurat 5<a class="anchor" aria-label="anchor" href="#seurat-and-seurat-"></a></h2>
+
+
+<p>The installed version is detected automatically. Under Seurat 4, <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code>
+binds every sample's counts into one matrix. Under Seurat 5 it keeps one
+layer per sample (<code>counts.Sample_A</code>, <code>counts.Sample_B</code>, ...), which is
+what Seurat 5's <code>IntegrateLayers()</code> wants but not what most other code
+expects. By default those layers are joined, so the merged object has the
+same shape whichever version made it. Set <code>joinLayers = FALSE</code> to keep them
+split; under Seurat 4 the argument has no effect.</p>
     </div>
     <div class="section level2">
     <h2 id="see-also">See also<a class="anchor" aria-label="anchor" href="#see-also"></a></h2>

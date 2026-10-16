@@ -87,15 +87,55 @@ you start:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu">BiocManager</span><span class="fu">::</span><span class="fu">install</span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"DropletUtils"</span>, <span class="st">"S4Vectors"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <div class="section level2">
+<h2 id="the-example-data">The example data<a class="anchor" aria-label="anchor" href="#the-example-data"></a>
+</h2>
+<p>Every example in this vignette runs on data bundled with rscprep: a
+cut-down copy of the 10x Genomics demo run <a href="https://www.10xgenomics.com/datasets/1-k-heart-cells-from-an-e-18-mouse-v-3-chemistry-3-standard-3-0-0" class="external-link">1k
+Heart Cells from an E18 Mouse (v3 chemistry)</a>. It is one sample from
+one <code>cellranger count</code> run (Cell Ranger 3.0.0, mm10
+reference), with all 1,011 cells Cell Ranger called.</p>
+<p>It comes in two forms, holding the same data:</p>
+<ul>
+<li>
+<strong><code>heart1k</code></strong> – a Seurat object, for
+examples that start after loading.</li>
+<li>
+<strong>A Cell Ranger <code>outs/</code> directory</strong> – for
+the functions that take a path. It holds
+<code>filtered_feature_bc_matrix.h5</code> (the called cells) and
+<code>raw_feature_bc_matrix.h5</code> (every barcode that had at least
+25 UMIs in the original run, empty droplets included):</li>
+</ul>
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">outs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"heart_1k_v3"</span>, <span class="st">"outs"</span>, package <span class="op">=</span> <span class="st">"rscprep"</span><span class="op">)</span></span></code></pre></div>
+<p>To keep the package small, only 2,092 of the 31,053 genes are kept:
+the 2,000 detected in the most cells, plus every mitochondrial,
+ribosomal protein and cell-cycle gene. Each cell therefore keeps about
+70% of its UMIs, and percentages such as <code>pctMito</code> read
+higher than they would on the full gene set. That is fine for showing
+how the functions behave and wrong for drawing conclusions about heart
+tissue. <code><a href="../reference/heart1k.html">?heart1k</a></code> has the details, and
+<code>data-raw/heart_1k_v3.R</code> in the package source rebuilds it
+from the 10x download.</p>
+<p>The bundled raw matrix drops every barcode that had fewer than 25
+UMIs in the original run. After the gene subset those barcodes total as
+little as 9, so the curves below stop near 10 on the y-axis; a full raw
+matrix runs down to 1.</p>
+</div>
+<div class="section level2">
 <h2 id="one-sample">One sample<a class="anchor" aria-label="anchor" href="#one-sample"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">ranks</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks</a></span><span class="op">(</span></span>
-<span>  path  <span class="op">=</span> <span class="st">"/path/to/Sample_1/outs"</span>,</span>
+<span>  path  <span class="op">=</span> <span class="va">outs</span>,</span>
 <span>  multi <span class="op">=</span> <span class="cn">FALSE</span></span>
 <span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: 20650 raw barcodes, 2092 features.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: knee at 11711 UMIs, inflection at 725 UMIs; 942 barcodes above the inflection (19708 below).</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Ranked 1 run of 1.</span></span>
 <span></span>
-<span><span class="va">ranks</span><span class="op">$</span><span class="va">Sample_1</span><span class="op">$</span><span class="va">plot</span></span></code></pre></div>
+<span><span class="va">ranks</span><span class="op">$</span><span class="va">heart_1k_v3</span><span class="op">$</span><span class="va">plot</span></span></code></pre></div>
+<p><img src="plotBarcodeRanks_files/figure-html/one-sample-1.png" class="r-plt" alt="" width="576"></p>
 <p><code>path</code> is the same <code>outs/</code> directory you would
 hand <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code>, and the sample is named the same way
 (after the folder above <code>outs</code>). What differs is which file
@@ -134,7 +174,7 @@ reads the <strong>raw</strong> matrix:</p>
 <tr class="odd">
 <td>Order</td>
 <td>10^3 to 10^4 columns</td>
-<td>10^5 to 10^6 columns</td>
+<td>10^5 to 10^6 columns (20,650 in the bundled copy)</td>
 </tr>
 </tbody>
 </table>
@@ -147,7 +187,7 @@ neither is a threshold applied to anything.</p>
 </h2>
 <p>The distinction that matters for reading these curves is whether the
 GEM well held one sample or several.</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># A `cellranger count` run</span></span>
 <span><span class="fu"><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks</a></span><span class="op">(</span>path <span class="op">=</span> <span class="st">"/path/to/Sample_1/outs"</span>, multi <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
@@ -191,8 +231,9 @@ this vignette can treat both rows above the same way.</p>
 <h2 id="a-batch-of-samples">A batch of samples<a class="anchor" aria-label="anchor" href="#a-batch-of-samples"></a>
 </h2>
 <p>Same manifest <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> takes, so one table drives
-both halves of the workflow:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+both halves of the workflow. The bundled data is one sample, so this
+example uses placeholder paths and is not run:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">manifest</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  Path <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span></span>
 <span>    <span class="st">"/path/to/Sample_1/outs"</span>,</span>
@@ -217,16 +258,29 @@ over.</p>
 <h2 id="what-comes-back">What comes back<a class="anchor" aria-label="anchor" href="#what-comes-back"></a>
 </h2>
 <p>One element per sample, each a list:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">sample_1</span> <span class="op">&lt;-</span> <span class="va">ranks</span><span class="op">$</span><span class="va">Sample_1</span></span>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">heart</span> <span class="op">&lt;-</span> <span class="va">ranks</span><span class="op">$</span><span class="va">heart_1k_v3</span></span>
 <span></span>
-<span><span class="va">sample_1</span><span class="op">$</span><span class="va">plot</span>                 <span class="co"># a ggplot2 object; nothing was printed or saved</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">sample_1</span><span class="op">$</span><span class="va">data</span><span class="op">)</span>           <span class="co"># the plotted curve</span></span>
-<span><span class="va">sample_1</span><span class="op">$</span><span class="va">knee</span>                 <span class="co"># optimistic cutoff, in UMIs</span></span>
-<span><span class="va">sample_1</span><span class="op">$</span><span class="va">inflection</span>           <span class="co"># permissive cutoff, in UMIs</span></span>
-<span><span class="va">sample_1</span><span class="op">$</span><span class="va">n_barcodes</span>           <span class="co"># barcodes in the raw matrix</span></span>
-<span><span class="va">sample_1</span><span class="op">$</span><span class="va">n_above_inflection</span>   <span class="co"># roughly, the cells you would expect</span></span>
-<span><span class="va">sample_1</span><span class="op">$</span><span class="va">h5</span>                   <span class="co"># the file this was computed from</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">heart</span><span class="op">$</span><span class="va">data</span><span class="op">)</span>            <span class="co"># the plotted curve</span></span>
+<span><span class="co">#&gt;              barcode rank total fitted</span></span>
+<span><span class="co">#&gt; 1 ACTGTGACAGGGTTGA-1    1 82062     NA</span></span>
+<span><span class="co">#&gt; 2 GGGACAAAGGGACTGT-1    2 69709     NA</span></span>
+<span><span class="co">#&gt; 3 GCTTTCGAGGTCATCT-1    3 63381     NA</span></span>
+<span><span class="co">#&gt; 4 GTTGCGGAGGTTGACG-1    4 60330     NA</span></span>
+<span><span class="co">#&gt; 5 GATCACAAGGCTCACC-1    5 59737     NA</span></span>
+<span><span class="co">#&gt; 6 CTCAAGAAGCGACTGA-1    6 52390     NA</span></span>
+<span><span class="va">heart</span><span class="op">$</span><span class="va">knee</span>                  <span class="co"># optimistic cutoff, in UMIs</span></span>
+<span><span class="co">#&gt; [1] 11710.79</span></span>
+<span><span class="va">heart</span><span class="op">$</span><span class="va">inflection</span>            <span class="co"># permissive cutoff, in UMIs</span></span>
+<span><span class="co">#&gt; [1] 724.8193</span></span>
+<span><span class="va">heart</span><span class="op">$</span><span class="va">n_barcodes</span>            <span class="co"># barcodes in the raw matrix</span></span>
+<span><span class="co">#&gt; [1] 20650</span></span>
+<span><span class="va">heart</span><span class="op">$</span><span class="va">n_above_inflection</span>    <span class="co"># roughly, the cells you would expect</span></span>
+<span><span class="co">#&gt; [1] 942</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">basename</a></span><span class="op">(</span><span class="va">heart</span><span class="op">$</span><span class="va">h5</span><span class="op">)</span>          <span class="co"># the file this was computed from</span></span>
+<span><span class="co">#&gt; [1] "raw_feature_bc_matrix.h5"</span></span></code></pre></div>
+<p><code>heart$plot</code> is the ggplot2 object drawn above. Nothing
+was printed or saved until it was asked for.</p>
 <p><code>data</code> is the curve, not the raw matrix: zero-count
 barcodes are dropped (they have no place on a log axis, and in a raw
 matrix they are the clear majority) and barcodes tying on total are
@@ -241,29 +295,42 @@ to write to CSV, which the full per-barcode table is not.</p>
 derived independently of Cell Ranger’s cell caller. Comparing it against
 what the filtered matrix actually kept is the whole point of drawing
 these:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># min.cells / min.features off, so `called` is what Cell Ranger kept</span></span>
+<span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span>path <span class="op">=</span> <span class="va">outs</span>, multi <span class="op">=</span> <span class="cn">FALSE</span>,</span>
+<span>                             min.cells <span class="op">=</span> <span class="fl">0</span>, min.features <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: 1011 cells, 2092 features.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Loaded 1 sample.</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  expected <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">ranks</span>, <span class="kw">function</span><span class="op">(</span><span class="va">x</span><span class="op">)</span> <span class="va">x</span><span class="op">$</span><span class="va">n_above_inflection</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span>,</span>
-<span>  called   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">ncol</span>, <span class="fu"><a href="https://rdrr.io/r/base/integer.html" class="external-link">integer</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
+<span>  called   <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">vapply</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">ncol</span>, <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">numeric</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
-<span><span class="co">#&gt;          expected called</span></span>
-<span><span class="co">#&gt; Sample_1     4914   4821</span></span>
-<span><span class="co">#&gt; Sample_2     5230   5104</span></span>
-<span><span class="co">#&gt; Sample_3    11702   6633</span></span></code></pre></div>
-<p>The first two agree closely, which is what a clean run looks like.
-<code>Sample_3</code> does not, and that is the signal: go look at its
-curve. A shallow slope with no clear cliff usually means ambient RNA,
-low viability, or a wetting failure, and the called cell count from that
-sample should be treated with suspicion regardless of which side of the
-discrepancy you believe.</p>
+<span><span class="co">#&gt;             expected called</span></span>
+<span><span class="co">#&gt; heart_1k_v3      942   1011</span></span></code></pre></div>
+<p>The two agree closely, which is what a clean run looks like: the
+curve has a sharp cliff, and Cell Ranger’s cell caller and the
+inflection point found nearly the same edge. A sample where they
+disagree badly is the signal to go look at its curve. A shallow slope
+with no clear cliff usually means ambient RNA, low viability, or a
+wetting failure, and the called cell count from that sample should be
+treated with suspicion regardless of which side of the discrepancy you
+believe.</p>
 </div>
 <div class="section level2">
 <h2 id="writing-figures-out">Writing figures out<a class="anchor" aria-label="anchor" href="#writing-figures-out"></a>
 </h2>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">ranks</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span>, outdir <span class="op">=</span> <span class="st">"qc/barcode_ranks"</span><span class="op">)</span></span></code></pre></div>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">outdir</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"barcode_ranks"</span><span class="op">)</span></span>
+<span><span class="va">ranks</span>  <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks</a></span><span class="op">(</span>path <span class="op">=</span> <span class="va">outs</span>, multi <span class="op">=</span> <span class="cn">FALSE</span>, outdir <span class="op">=</span> <span class="va">outdir</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Created <span style="color: #0000BB;">/tmp/Rtmp2myAKd/barcode_ranks</span>.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: 20650 raw barcodes, 2092 features.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: knee at 11711 UMIs, inflection at 725 UMIs; 942 barcodes above the inflection (19708 below).</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: wrote <span style="color: #0000BB;">/tmp/Rtmp2myAKd/barcode_ranks/heart_1k_v3_barcode_ranks.csv</span> and <span style="color: #0000BB;">/tmp/Rtmp2myAKd/barcode_ranks/heart_1k_v3_barcode_ranks.png</span>.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Ranked 1 run of 1.</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/list.files.html" class="external-link">list.files</a></span><span class="op">(</span><span class="va">outdir</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "heart_1k_v3_barcode_ranks.csv" "heart_1k_v3_barcode_ranks.png"</span></span></code></pre></div>
 <p>Writes <code>&lt;sample&gt;_barcode_ranks.csv</code> and
 <code>&lt;sample&gt;_barcode_ranks.png</code> per sample, creating the
 directory if needed, and still returns everything in memory. Sample
@@ -277,38 +344,95 @@ list names are left alone. <code>width</code>, <code>height</code> and
 <h2 id="tuning-the-fit">Tuning the fit<a class="anchor" aria-label="anchor" href="#tuning-the-fit"></a>
 </h2>
 <p><code>lower</code> is the total UMI count at or below which a barcode
-is assumed empty. It sets the ambient profile and bounds the spline fit;
-it does <strong>not</strong> filter the curve, and barcodes below it are
-still plotted.</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span>, lower <span class="op">=</span> <span class="fl">500</span><span class="op">)</span><span class="op">$</span><span class="va">Sample_1</span><span class="op">$</span><span class="va">plot</span></span></code></pre></div>
-<p>Anything else goes to <code><a href="https://rdrr.io/pkg/DropletUtils/man/barcodeRanks.html" class="external-link">DropletUtils::barcodeRanks()</a></code>:</p>
+is assumed empty. Only barcodes above it are searched for the knee and
+inflection; it does <strong>not</strong> filter the curve, and barcodes
+below it are still plotted.</p>
 <div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks</a></span><span class="op">(</span>path <span class="op">=</span> <span class="va">outs</span>, multi <span class="op">=</span> <span class="cn">FALSE</span>, lower <span class="op">=</span> <span class="fl">500</span><span class="op">)</span><span class="op">$</span><span class="va">heart_1k_v3</span><span class="op">$</span><span class="va">plot</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: 20650 raw barcodes, 2092 features.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: knee at 11711 UMIs, inflection at 1533 UMIs; 812 barcodes above the inflection (19838 below).</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Ranked 1 run of 1.</span></span></code></pre></div>
+<p><img src="plotBarcodeRanks_files/figure-html/lower-1.png" class="r-plt" alt="" width="576"></p>
+<p>Anything else goes to <code><a href="https://rdrr.io/pkg/DropletUtils/man/barcodeRanks.html" class="external-link">DropletUtils::barcodeRanks()</a></code>:</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks</a></span><span class="op">(</span></span>
-<span>  manifest     <span class="op">=</span> <span class="va">manifest</span>,</span>
+<span>  path         <span class="op">=</span> <span class="va">outs</span>,</span>
+<span>  multi        <span class="op">=</span> <span class="cn">FALSE</span>,</span>
 <span>  lower        <span class="op">=</span> <span class="fl">100</span>,</span>
-<span>  fit.bounds   <span class="op">=</span> <span class="cn">NULL</span>,</span>
-<span>  exclude.from <span class="op">=</span> <span class="fl">50</span>,</span>
-<span>  df           <span class="op">=</span> <span class="fl">20</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>Raise <code>df</code> for a stiffer spline if the fitted line is
-chasing noise in the tail; <code>exclude.from</code> drops the
-highest-ranked barcodes from the fit, which helps when a handful of
-enormous barcodes drag the knee upward.</p>
+<span>  exclude.from <span class="op">=</span> <span class="fl">50</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: 20650 raw barcodes, 2092 features.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: knee at 11711 UMIs, inflection at 725 UMIs; 942 barcodes above the inflection (19708 below).</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Ranked 1 run of 1.</span></span></code></pre></div>
+<p><img src="plotBarcodeRanks_files/figure-html/dots-1.png" class="r-plt" alt="" width="576"></p>
+<p><code>exclude.from</code> drops the highest-ranked barcodes from the
+search, which helps when a handful of enormous barcodes drag the knee
+upward.</p>
+<p>Which other arguments do anything depends on your DropletUtils
+version, because <code>barcodeRanks()</code> changed how it finds the
+knee:</p>
+<table class="table">
+<colgroup>
+<col width="25%">
+<col width="25%">
+<col width="25%">
+<col width="25%">
+</colgroup>
+<thead><tr class="header">
+<th>DropletUtils</th>
+<th>How the knee is found</th>
+<th>Arguments that tune it</th>
+<th>Fitted line on the plot</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>before 1.28</td>
+<td>smoothing spline, then its derivatives</td>
+<td>
+<code>fit.bounds</code>, <code>df</code>
+</td>
+<td>yes</td>
+</tr>
+<tr class="even">
+<td>1.28</td>
+<td>spline; knee farthest from the plateau-to-inflection line</td>
+<td>
+<code>fit.bounds</code>, <code>df</code>
+</td>
+<td>yes</td>
+</tr>
+<tr class="odd">
+<td>1.30 and later</td>
+<td>curve tracing, no spline</td>
+<td>
+<code>window</code>, <code>gradient.threshold</code>
+</td>
+<td>no – <code>data$fitted</code> is <code>NA</code>
+</td>
+</tr>
+</tbody>
+</table>
+<p><code><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks()</a></code> adapts to whichever is installed. But
+the same data can give a different knee, and sometimes a different
+inflection, under different versions, so record
+<code>packageVersion("DropletUtils")</code> alongside any cutoff you
+report.</p>
 </div>
 <div class="section level2">
 <h2 id="changing-the-figure">Changing the figure<a class="anchor" aria-label="anchor" href="#changing-the-figure"></a>
 </h2>
 <p>The plots are plain ggplots, so nothing is locked in:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://ggplot2.tidyverse.org" class="external-link">ggplot2</a></span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">ranks</span><span class="op">$</span><span class="va">Sample_1</span><span class="op">$</span><span class="va">plot</span> <span class="op">+</span></span>
-<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>subtitle <span class="op">=</span> <span class="st">"Re-sequenced 2026-08-14"</span><span class="op">)</span> <span class="op">+</span></span>
+<span><span class="va">ranks</span><span class="op">$</span><span class="va">heart_1k_v3</span><span class="op">$</span><span class="va">plot</span> <span class="op">+</span></span>
+<span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>subtitle <span class="op">=</span> <span class="st">"E18 mouse heart, 10x demo run"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="../reference/theme_prepro.html">theme_prepro</a></span><span class="op">(</span><span class="st">"clean"</span><span class="op">)</span></span></code></pre></div>
+<p><img src="plotBarcodeRanks_files/figure-html/customise-1.png" class="r-plt" alt="" width="576"></p>
 <p>And <code>data</code> is a plain data frame, so a single figure
-across every sample is one <code>rbind</code> away:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+across every sample is one <code>rbind</code> away. With several samples
+in <code>ranks</code> (one here, so this is not run):</p>
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">curves</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/do.call.html" class="external-link">do.call</a></span><span class="op">(</span><span class="va">rbind</span>, <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">ranks</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">s</span><span class="op">)</span> <span class="op">{</span></span>
 <span>  <span class="fu"><a href="https://rdrr.io/r/base/cbind.html" class="external-link">cbind</a></span><span class="op">(</span>Sample <span class="op">=</span> <span class="va">s</span>, <span class="va">ranks</span><span class="op">[[</span><span class="va">s</span><span class="op">]</span><span class="op">]</span><span class="op">$</span><span class="va">data</span><span class="op">)</span></span>
 <span><span class="op">}</span><span class="op">)</span><span class="op">)</span></span>
@@ -333,10 +457,19 @@ same rule as <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a>
 <p>In manifest mode the sample is skipped with a warning and the rest of
 the batch still runs, so the returned list can be shorter than the
 manifest:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">ranks</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span><span class="op">)</span></span>
-<span><span class="co">#&gt; ! Raw matrix for "Sample_2" not found at '/path/to/Sample_2/outs/raw_feature_bc_matrix.h5'</span></span>
-<span><span class="co">#&gt; v Ranked 2 runs of 3.</span></span>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># the bundled sample, plus a run whose outs/ was never copied over</span></span>
+<span><span class="va">manifest</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
+<span>  Path  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="va">outs</span>, <span class="fu"><a href="https://rdrr.io/r/base/file.path.html" class="external-link">file.path</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/tempfile.html" class="external-link">tempdir</a></span><span class="op">(</span><span class="op">)</span>, <span class="st">"Sample_2"</span>, <span class="st">"outs"</span><span class="op">)</span><span class="op">)</span>,</span>
+<span>  multi <span class="op">=</span> <span class="cn">FALSE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="va">ranks</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: 20650 raw barcodes, 2092 features.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: knee at 11711 UMIs, inflection at 725 UMIs; 942 barcodes above the inflection (19708 below).</span></span>
+<span><span class="co">#&gt; Warning: Raw matrix for <span style="color: #0000BB;">"Sample_2"</span> not found at</span></span>
+<span><span class="co">#&gt; <span style="color: #0000BB;">/tmp/Rtmp2myAKd/Sample_2/outs/raw_feature_bc_matrix.h5</span></span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Ranked 1 run of 2.</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">basename</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">dirname</a></span><span class="op">(</span><span class="va">manifest</span><span class="op">$</span><span class="va">Path</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">ranks</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "Sample_2"</span></span></code></pre></div>
@@ -356,13 +489,18 @@ to be fetched.</p>
 reads each one, ranks it, and drops it. If you want the matrices,
 <code><a href="../reference/rawMatrixFrom10x.html">rawMatrixFrom10x()</a></code> takes the same arguments and returns
 them, with no such promise about memory:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rawMatrixFrom10x.html">rawMatrixFrom10x</a></span><span class="op">(</span>path <span class="op">=</span> <span class="st">"/path/to/Sample_1/outs"</span>, multi <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">raw</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/rawMatrixFrom10x.html">rawMatrixFrom10x</a></span><span class="op">(</span>path <span class="op">=</span> <span class="va">outs</span>, multi <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> <span style="color: #0000BB;">"heart_1k_v3"</span>: 20650 raw barcodes, 2092 features.</span></span>
+<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Loaded 1 raw matrix from 1 run.</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">raw</span><span class="op">$</span><span class="va">Sample_1</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1]   36601 6794880</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/dim.html" class="external-link">dim</a></span><span class="op">(</span><span class="va">raw</span><span class="op">$</span><span class="va">heart_1k_v3</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1]  2092 20650</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums-methods.html" class="external-link">colSums</a></span><span class="op">(</span><span class="va">raw</span><span class="op">$</span><span class="va">Sample_1</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/range.html" class="external-link">range</a></span><span class="op">(</span><span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/colSums-methods.html" class="external-link">colSums</a></span><span class="op">(</span><span class="va">raw</span><span class="op">$</span><span class="va">heart_1k_v3</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1]     9 82062</span></span></code></pre></div>
+<p>The original raw matrix had 6,794,880 barcodes. The bundled copy
+keeps the 20,650 that had at least 25 UMIs before the gene subset.</p>
 <p>It returns count matrices rather than Seurat objects on purpose.
 Wrapping a raw matrix in a Seurat object means computing per-cell
 metadata for hundreds of thousands of droplets that are about to be

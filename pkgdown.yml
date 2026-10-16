@@ -7,7 +7,7 @@ articles:
   plotBarcodeRanks: plotBarcodeRanks.html
   qcMetrics: qcMetrics.html
   seuratFrom10x: seuratFrom10x.html
-last_built: 2026-10-16T16:01Z
+last_built: 2026-10-16T16:52Z
 urls:
   reference: https://mikemartinez99.github.io/rscprep/reference
   article: https://mikemartinez99.github.io/rscprep/articles
