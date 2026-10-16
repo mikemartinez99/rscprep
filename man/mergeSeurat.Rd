@@ -4,12 +4,16 @@
 \alias{mergeSeurat}
 \title{Merge a Named List of Seurat Objects into One}
 \usage{
-mergeSeurat(objList)
+mergeSeurat(objList, joinLayers = TRUE)
 }
 \arguments{
 \item{objList}{Named list of \link[Seurat:reexports]{Seurat} objects,
 one per sample, as returned by \code{\link[=seuratFrom10x]{seuratFrom10x()}}. Names are used as cell
 barcode prefixes and must be unique.}
+
+\item{joinLayers}{Under Seurat 5, join the per-sample layers \code{merge()}
+creates back into one per kind of data. Defaults to \code{TRUE}. Ignored under
+Seurat 4, which never splits them. See \emph{Seurat 4 and Seurat 5}.}
 }
 \value{
 A single merged \link[Seurat:reexports]{Seurat} object,
@@ -39,15 +43,27 @@ must:
 \item contain only structurally valid Seurat objects;
 \item be fully named, with no \code{NA}, blank or duplicated names;
 \item contain no zero-cell objects;
+\item carry an \code{Ident} metadata column, which \code{\link[=seuratFrom10x]{seuratFrom10x()}} sets to the
+sample name;
 \item agree on \code{\link[Seurat:reexports]{Seurat::DefaultAssay()}} across every element.
 }
 
 Two further checks run \emph{after} the merge, guarding against a merge that
 silently loses data: every sample must still be represented in the merged
 \code{Ident} metadata column, and the merged cell count must equal the sum of
-the inputs'. The first of these relies on each input object carrying an
-\code{Ident} column, which \code{\link[=seuratFrom10x]{seuratFrom10x()}} sets to the sample name.
+the inputs'.
 }
+\section{Seurat 4 and Seurat 5}{
+
+The installed version is detected automatically. Under Seurat 4, \code{merge()}
+binds every sample's counts into one matrix. Under Seurat 5 it keeps one
+layer per sample (\code{counts.Sample_A}, \code{counts.Sample_B}, ...), which is
+what Seurat 5's \code{IntegrateLayers()} wants but not what most other code
+expects. By default those layers are joined, so the merged object has the
+same shape whichever version made it. Set \code{joinLayers = FALSE} to keep them
+split; under Seurat 4 the argument has no effect.
+}
+
 \examples{
 \dontrun{
 seurat_list <- seuratFrom10x(

@@ -119,3 +119,20 @@ still need to assign it to keep it:
 mergeSeurat(seurat_list)             # prints a summary; result is not kept
 merged <- mergeSeurat(seurat_list)   # assign to keep it
 ```
+
+## Seurat 4 and Seurat 5
+
+`mergeSeurat()` detects which Seurat is installed. Under Seurat 4, `merge()`
+binds every sample's counts into one matrix. Under Seurat 5 it keeps one
+layer per sample instead (`counts.Sample_A`, `counts.Sample_B`, ...).
+`mergeSeurat()` joins those layers by default, so the merged object has the
+same shape under either version and code downstream does not need to know
+which one made it.
+
+Seurat 5's own integration workflow, `IntegrateLayers()`, wants the layers
+split. Ask for that with `joinLayers = FALSE`; under Seurat 4 the argument
+does nothing:
+
+```{r split-layers, eval = FALSE}
+merged <- mergeSeurat(seurat_list, joinLayers = FALSE)
+```

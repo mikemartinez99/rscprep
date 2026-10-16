@@ -19,17 +19,30 @@
 #' * contain only structurally valid Seurat objects;
 #' * be fully named, with no `NA`, blank or duplicated names;
 #' * contain no zero-cell objects;
+#' * carry an `Ident` metadata column, which [seuratFrom10x()] sets to the
+#'   sample name;
 #' * agree on [Seurat::DefaultAssay()] across every element.
 #'
 #' Two further checks run *after* the merge, guarding against a merge that
 #' silently loses data: every sample must still be represented in the merged
 #' `Ident` metadata column, and the merged cell count must equal the sum of
-#' the inputs'. The first of these relies on each input object carrying an
-#' `Ident` column, which [seuratFrom10x()] sets to the sample name.
+#' the inputs'.
+#'
+#' @section Seurat 4 and Seurat 5:
+#' The installed version is detected automatically. Under Seurat 4, `merge()`
+#' binds every sample's counts into one matrix. Under Seurat 5 it keeps one
+#' layer per sample (`counts.Sample_A`, `counts.Sample_B`, ...), which is
+#' what Seurat 5's `IntegrateLayers()` wants but not what most other code
+#' expects. By default those layers are joined, so the merged object has the
+#' same shape whichever version made it. Set `joinLayers = FALSE` to keep them
+#' split; under Seurat 4 the argument has no effect.
 #'
 #' @param objList Named list of [Seurat][Seurat::CreateSeuratObject] objects,
 #'   one per sample, as returned by [seuratFrom10x()]. Names are used as cell
 #'   barcode prefixes and must be unique.
+#' @param joinLayers Under Seurat 5, join the per-sample layers `merge()`
+#'   creates back into one per kind of data. Defaults to `TRUE`. Ignored under
+#'   Seurat 4, which never splits them. See *Seurat 4 and Seurat 5*.
 #'
 #' @return A single merged [Seurat][Seurat::CreateSeuratObject] object,
 #'   returned **invisibly** (the object is printed as a side effect). Cell
@@ -58,7 +71,7 @@
 #' @importFrom Seurat DefaultAssay
 #' @importFrom methods validObject
 #' @export
-mergeSeurat <- function(objList) {
+mergeSeurat <- function(objList, joinLayers = TRUE) {
     arg_name <- deparse(substitute(objList))
 
     #== Guard against empty or trivial input
@@ -96,10 +109,24 @@ mergeSeurat <- function(objList) {
     }
 
     #== No zero-cell objects
-    n_cells <- vapply(objList, ncol, integer(1))
+    n_cells <- vapply(objList, ncol, numeric(1))   # double under SeuratObject 5
     if (any(n_cells == 0)) {
         empty_samples <- samples[n_cells == 0]
         cli::cli_abort("The following sample(s) have zero cells: {empty_samples}")
+    }
+
+    #== Every object must carry Ident -- the post-merge check reads it. Checked
+    #== here because a missing column otherwise surfaces as SeuratObject's own
+    #== error from `merged_obj$Ident`, worded differently by Seurat 4 and 5
+    #== and naming neither the argument nor the sample.
+    no_ident <- samples[!vapply(objList, function(x) "Ident" %in% colnames(x@meta.data),
+                                logical(1))]
+    if (length(no_ident) > 0) {
+        cli::cli_abort(c(
+            "The following element(s) of '{arg_name}' have no {.field Ident} column: {no_ident}",
+            "i" = "{.fn seuratFrom10x} sets it to the sample name; set it the
+                   same way on objects built another way."
+        ))
     }
 
     #== All objects must share the same default assay
@@ -127,6 +154,10 @@ mergeSeurat <- function(objList) {
             "Cell count mismatch after merging '{arg_name}': expected {sum(n_cells)}, got {ncol(merged_obj)}."
         )
     }
+
+    #== Seurat 5 only: merge() left one layer per sample; join them so the
+    #== result matches what Seurat 4 returns. A no-op under Seurat 4.
+    if (isTRUE(joinLayers)) merged_obj <- joinAssayLayers(merged_obj)
 
     cli::cli_alert_success("Successfully merged {n_objects} seurat objects.")
     print(merged_obj)

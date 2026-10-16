@@ -11,10 +11,12 @@ test_that("bundled outs/ reads through seuratFrom10x()", {
         seuratFrom10x(path = outs, multi = FALSE, min.cells = 0, min.features = 0)
     )
     expect_named(seurat_list, "heart_1k_v3")
-    expect_identical(
-        SeuratObject::GetAssayData(seurat_list[[1]], slot = "counts"),
-        SeuratObject::GetAssayData(heart1k, slot = "counts")
-    )
+    # Compared through dimnames and per-cell totals rather than the counts
+    # matrix itself, which SeuratObject 4 and 5 fetch with different arguments.
+    obj <- seurat_list[[1]]
+    expect_identical(dimnames(obj), dimnames(heart1k))
+    expect_equal(unname(obj$nCount_RNA), unname(heart1k$nCount_RNA))
+    expect_equal(unname(obj$nFeature_RNA), unname(heart1k$nFeature_RNA))
 })
 
 test_that("bundled raw matrix is a superset of the filtered cells", {

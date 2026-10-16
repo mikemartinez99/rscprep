@@ -217,7 +217,12 @@ make_seurat_list <- function(idents = c("Sample_A", "Sample_B"), ...) {
 #' data matrices, no metadata rows. The result still passes `inherits()` and
 #' `validObject()`, which is exactly what mergeSeurat()'s zero-cell guard is
 #' there to catch.
+#'
+#' The hollowing writes the `@counts` and `@data` slots of a classic `Assay`.
+#' Seurat 5 builds an `Assay5` by default, which has neither, so the object is
+#' built as a classic assay under either version. Seurat 4 ignores the option.
 make_empty_seurat <- function(ident = "Sample_Empty", n_genes = 20) {
+    withr::local_options(Seurat.object.assay.version = "v3")
     obj   <- make_seurat(ident, n_cells = 2, n_genes = n_genes)
     empty <- Matrix::Matrix(
         matrix(0, nrow = n_genes, ncol = 0,
@@ -387,6 +392,19 @@ make_cellcycle_seurat <- function(markers   = c(Seurat::cc.genes$s.genes,
                                       min.cells = 0, min.features = 0)
     if (normalise) obj <- Seurat::NormalizeData(obj, verbose = FALSE)
     obj
+}
+
+#' Replace an object's normalised data, under either Seurat version.
+#'
+#' Seurat 4 sets it with `SetAssayData(slot = )`; Seurat 5 made `slot`
+#' defunct and writes layers through `LayerData<-`.
+set_data_layer <- function(obj, values) {
+    if (isSeuratV5()) {
+        set_layer <- getExportedValue("SeuratObject", "LayerData<-")
+        set_layer(obj, layer = "data", value = values)
+    } else {
+        Seurat::SetAssayData(obj, slot = "data", new.data = values)
+    }
 }
 
 #' Mock orthogene::convert_orthologs() for the duration of the calling test.

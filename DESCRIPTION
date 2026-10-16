@@ -22,6 +22,7 @@ Imports:
     grid,
     methods,
     Seurat,
+    SeuratObject,
     stats,
     utils
 Suggests:

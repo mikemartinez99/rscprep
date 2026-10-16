@@ -167,15 +167,13 @@ test_that("the merged object is returned invisibly", {
 
 # ---- post-merge guards ---------------------------------------------------
 
-test_that("objects with no Ident column fail with a raw Seurat error", {
-    # Known gap: the post-merge check assumes Ident exists (seuratFrom10x()
-    # always sets it). If it does not, `merged_obj$Ident` raises inside
-    # SeuratObject before mergeSeurat() can report anything useful -- so the
-    # user sees a Seurat internal message, not one naming the argument.
-    # Update this test if the check starts guarding for a missing column.
-    obj_list <- list(Sample_A = make_seurat(NULL), Sample_B = make_seurat(NULL))
+test_that("objects with no Ident column are rejected before merging", {
+    # Checked up front so the message is the package's own, and the same under
+    # Seurat 4 and 5 -- left to the post-merge check, SeuratObject raised its
+    # own error, worded differently by each version.
+    obj_list <- list(Sample_A = make_seurat(NULL), Sample_B = make_seurat("Sample_B"))
 
-    expect_error(mergeSeurat(obj_list), "Cannot find 'Ident' in this Seurat object")
+    expect_error(mergeSeurat(obj_list), "no Ident column:\\s+Sample_A")
 })
 
 test_that("a sample whose Ident collapses into another is named", {

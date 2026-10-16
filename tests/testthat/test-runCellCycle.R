@@ -22,8 +22,7 @@ test_that("an undecidable object returns NA rather than erroring", {
     # no non-zero values to inspect, so the heuristic has nothing to go on
     obj <- make_cellcycle_seurat(markers = "MCM5", n_bg = 5, n_cells = 4,
                                  normalise = FALSE)
-    obj <- Seurat::SetAssayData(obj, slot = "data",
-                                new.data = obj[["RNA"]]@data * 0)
+    obj <- set_data_layer(obj, getLayerValues(obj, "counts") * 0)
 
     expect_true(is.na(looksUnnormalised(obj)))
 })
@@ -198,9 +197,8 @@ test_that("the normalisation the object gets is the ordinary one", {
 
     res <- suppressWarnings(runCellCycle(obj, "hsa"))
 
-    expect_equal(Seurat::GetAssayData(res, slot = "data"),
-                 Seurat::GetAssayData(Seurat::NormalizeData(obj, verbose = FALSE),
-                                      slot = "data"))
+    expect_equal(getLayerValues(res, "data"),
+                 getLayerValues(Seurat::NormalizeData(obj, verbose = FALSE), "data"))
 })
 
 test_that("normalising leaves the counts layer alone", {
@@ -208,8 +206,8 @@ test_that("normalising leaves the counts layer alone", {
 
     res <- suppressWarnings(runCellCycle(obj, "hsa"))
 
-    expect_equal(Seurat::GetAssayData(res, slot = "counts"),
-                 Seurat::GetAssayData(obj, slot = "counts"))
+    expect_equal(getLayerValues(res, "counts"),
+                 getLayerValues(obj, "counts"))
 })
 
 test_that("an already-normalised object is left exactly as it was", {
@@ -217,8 +215,8 @@ test_that("an already-normalised object is left exactly as it was", {
 
     res <- expect_no_warning(runCellCycle(obj, "hsa"))
 
-    expect_equal(Seurat::GetAssayData(res, slot = "data"),
-                 Seurat::GetAssayData(obj, slot = "data"))
+    expect_equal(getLayerValues(res, "data"),
+                 getLayerValues(obj, "data"))
 })
 
 # ---- runCellCycle: markers against the object ----------------------------

@@ -210,8 +210,8 @@ test_that("min.cells and min.features apply uniformly across all rows", {
         min.features = 0
     )
 
-    expect_equal(unname(vapply(res, nrow, integer(1))), c(61L, 61L))
-    expect_equal(unname(vapply(res, ncol, integer(1))), c(21L, 21L))
+    expect_equal(unname(vapply(res, nrow, numeric(1))), c(61, 61))
+    expect_equal(unname(vapply(res, ncol, numeric(1))), c(21, 21))
 })
 
 test_that("NA in manifest$multi is not caught by validation", {
