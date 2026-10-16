@@ -11,7 +11,7 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment  = "#>",
-  eval     = FALSE  # paths below are illustrative, not real -- flip to TRUE
+  eval     = FALSE  # paths below are illustrative, not real; flip to TRUE
                      # once this vignette points at a bundled example dataset
 )
 ```
@@ -21,20 +21,18 @@ library(rscprep)
 library(Seurat)
 ```
 
-`seuratFrom10x()` handles the two shapes 10x Cell Ranger output actually comes
-in -- standard single-sample `cellranger count` runs, and demuxed
-`cellranger multi` runs -- behind one interface, so downstream code doesn't
-need to branch on which one it's looking at.
+`seuratFrom10x()` is a helper function to efficiently read in single cell datasets from 10X. This function supports
+both 10X CellRanger output formats: standard single-sample `cellranger count` runs, and demuxed
+`cellranger multi` runs.
 
-You can point it at a single sample or run directly, or hand it a manifest
-describing a batch of runs from either pipeline. Either way, it returns a
+You can point it at a single sample or directory, or hand it a manifest file
+describing a batch of multiple runs from either pipeline or both. It returns a
 named list of Seurat objects, one per sample, ready to merge or process
-independently.
+independently. Importantly, the package auto detects which version of Seurat you have to
+account for `SeuratObject` differences between v4 and v5.
 
-The `multi` argument is the one thing you have to get right, and it asks
-which *pipeline* wrote the directory -- not whether samples were pooled. See
-"Choosing `multi`" below if the run came off `cellranger multi` with a single
-sample in it, which is the usual shape for Flex and 5'.
+The `multi` argument controls how the function reads in your data. It tells the code
+which pipeline wrote the directory, `count` or `multi`.
 
 ## A `cellranger count` run
 
@@ -47,7 +45,7 @@ seurat_list <- seuratFrom10x(
 seurat_list$Sample_1
 ```
 
-`path` should point to the Cell Ranger `outs/` directory -- the function
+`path` should point to the Cell Ranger `outs/` directory. The function then
 looks for `filtered_feature_bc_matrix.h5` directly inside it. The sample name
 is inferred from the parent folder (`Sample_1`, one level up from `outs`).
 
@@ -66,7 +64,7 @@ names(seurat_list)
 For `cellranger multi` output, one `outs/` directory holds every demuxed
 sample under `per_sample_outs/<sample>/`. `seuratFrom10x()` reads each
 sample's `count/sample_filtered_feature_bc_matrix.h5` separately and returns
-one Seurat object per demuxed sample -- a single function call here returns a
+one Seurat object per demuxed sample. A single function call here returns a
 list, not a single object.
 
 ## A batch of runs via manifest
@@ -85,17 +83,15 @@ seurat_list <- seuratFrom10x(manifest = manifest, min.cells = 3, min.features = 
 ```
 
 The manifest needs a `Path` column (each row's `outs/` directory) and a
-logical `multi` column. Rows can mix the two pipelines freely -- each row is
-resolved independently, and a `multi = TRUE` row expands into one entry per
-demuxed sample in the returned list. If a sample's expected H5 file is
+logical `multi` column passed as a vector. Rows can mix the two pipelines freely.
+If a sample's expected H5 file is
 missing, that row is skipped with a warning rather than failing the whole
 batch; single-path mode fails immediately instead, since there's nothing left
 to fall back on.
 
 ## Choosing `multi`
 
-`multi` picks between two directory layouts, and the two Cell Ranger
-pipelines write different ones:
+`multi` picks between two directory layouts.
 
 | `multi` | Pipeline | Where the filtered H5 lives |
 |---|---|---|
@@ -104,20 +100,19 @@ pipelines write different ones:
 
 The question is which pipeline ran, not how many samples came out of it.
 `cellranger multi` writes `per_sample_outs/` even when it demultiplexed
-exactly one sample -- routine for Flex and 5' -- so those runs need
-`multi = TRUE` despite not being multiplexed in any biological sense. If you
-are unsure, look for `per_sample_outs/` inside `outs/`: if it is there, the
+exactly one sample, so those runs need `multi = TRUE` despite not being multiplexed in any biological sense.
+If you are unsure, look for `per_sample_outs/` inside `outs/`: if it is there, the
 run needs `multi = TRUE`.
 
-This argument used to be called `multiplexed`, which read as a claim about
+**This argument used to be called `multiplexed`, which read as a claim about
 the experiment rather than about the pipeline. The old name still works and
-warns.
+warns.**
 
 ## Notes
 
 `min.cells` and `min.features` are passed straight through to
 `Seurat::CreateSeuratObject()` and apply uniformly across every sample in a
-batch -- set them once at the level of granularity you actually want, not
-per-sample. The function forces classic (v4-style) Seurat assay objects
-internally regardless of which Seurat package version is installed, so
-results are consistent even in mixed-Seurat-version environments.
+batch.
+
+The code auto-detects the Seurat version in your session and reads in as either classic assay or Assay5
+accordingly.

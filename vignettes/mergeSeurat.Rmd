@@ -11,7 +11,7 @@ vignette: >
 knitr::opts_chunk$set(
   collapse = TRUE,
   comment  = "#>",
-  eval     = FALSE  # paths below are illustrative, not real -- flip to TRUE
+  eval     = FALSE  # paths below are illustrative, not real; flip to TRUE
                      # once this vignette points at a bundled example dataset
 )
 ```
@@ -21,9 +21,9 @@ library(rscprep)
 library(Seurat)
 ```
 
-`seuratFrom10x()` hands back a named list -- one Seurat object per sample.
+`seuratFrom10x()` hands back a named list: one Seurat object per sample.
 `mergeSeurat()` is the other half of that pairing: it collapses the list into
-a single object you can take through a normalisation and integration
+a single merged object you can take through a normalisation and integration
 workflow, without losing track of which cell came from which sample.
 
 ## The basic pipeline
@@ -43,7 +43,7 @@ reordering in between.
 
 ## What the list names are for
 
-The names of `objList` are not decoration -- they are passed to `merge()` as
+The names of `objList` are not decoration. They are passed to `merge()` as
 `add.cell.id`, so each becomes a prefix on that sample's cell barcodes:
 
 ```{r barcodes}
@@ -57,7 +57,7 @@ colnames(merged)[1:2]
 This matters because 10x barcodes are drawn from a fixed whitelist, so the
 same barcode routinely appears in several samples. Prefixing keeps them
 distinct and keeps every cell traceable back to its origin. It is also why
-names must be present and unique -- `mergeSeurat()` refuses to merge a list
+names must be present and unique. `mergeSeurat()` refuses to merge a list
 that is unnamed, has blank or `NA` names, or repeats a name.
 
 The `Ident` column set by `seuratFrom10x()` is carried through the merge, so
@@ -69,42 +69,46 @@ table(merged$Ident)
 #>     4821     5104
 ```
 
-## What gets checked
+## Seurat 4 and Seurat 5
 
-The list is validated before anything is merged, so a bad batch fails with a
-message naming the offending sample rather than producing a subtly wrong
-object. `mergeSeurat()` requires that `objList`:
+`mergeSeurat()` works under both versions and detects which one is installed.
+The difference it handles is what `merge()` returns. Under Seurat 4, every
+sample's counts are bound into one matrix. Under Seurat 5, each sample keeps
+its own layer: `counts.Sample_A`, `counts.Sample_B`, and so on.
 
-* is non-empty;
-* contains only structurally valid Seurat objects;
-* is fully named, with no blank, `NA` or duplicated names;
-* contains no zero-cell objects;
-* agrees on `DefaultAssay()` across every element.
+By default `mergeSeurat()` joins those layers, so the merged object has the
+same shape whichever version made it:
 
-The assay check is about *agreement*, not about `RNA` specifically -- a list
-of `ADT` objects merges fine, a list mixing `RNA` and `ADT` does not.
-
-Two more checks run after the merge, to catch a merge that silently lost
-data: every sample must still be present in the merged `Ident` column, and
-the merged cell count must equal the sum of the inputs'.
-
-## Two behaviours worth knowing
-
-A single-element list short-circuits. The lone object is returned as-is,
-with a message -- unmerged, and with its barcodes left unprefixed:
-
-```{r single}
-one <- seuratFrom10x(path = "/path/to/Sample_1/outs", multi = FALSE)
-
-merged <- mergeSeurat(one)
-#> i 'one' has only one object; returning it unmerged.
+```{r layers-joined}
+merged <- mergeSeurat(seurat_list)
+merged
+#> An object of class Seurat
+#> 33538 features across 9925 samples within 1 assay
+#> Active assay: RNA (33538 features, 0 variable features)
+#>  1 layer present: counts
 ```
 
-And the merged object is returned **invisibly**, after being printed. So a
-bare call shows you the result without flooding the console twice, but you
-still need to assign it to keep it:
+Seurat 5's own integration workflow, `IntegrateLayers()`, needs the layers
+split by sample. Ask for that with `joinLayers = FALSE`:
 
-```{r invisible}
-mergeSeurat(seurat_list)      # prints a summary; result is not kept
-merged <- mergeSeurat(seurat_list)   # assign to keep it
+```{r layers-split}
+merged_split <- mergeSeurat(seurat_list, joinLayers = FALSE)
+merged_split
+#> An object of class Seurat
+#> 33538 features across 9925 samples within 1 assay
+#> Active assay: RNA (33538 features, 0 variable features)
+#>  2 layers present: counts.Sample_A, counts.Sample_B
 ```
+
+What happens in each case:
+
+| Situation | Result |
+|---|---|
+| Seurat 5, `Assay5` assays, `joinLayers = TRUE` (default) | Layers joined into one `counts` layer |
+| Seurat 5, `joinLayers = FALSE` | Layers left split, one per sample |
+| Seurat 4 | Nothing to join; `merge()` never splits, and `joinLayers` is ignored |
+| A list of one object | Returned unmerged, so there are no layers to join |
+
+Joining is decided assay by assay, from each assay's class rather than from
+the installed version alone. An object with several assays has only its
+`Assay5` assays joined.

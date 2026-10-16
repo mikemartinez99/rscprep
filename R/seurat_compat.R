@@ -52,7 +52,7 @@ seuratV5Fn <- function(name) {
 #'
 #' @noRd
 getLayerValues <- function(obj, layer, assay = NULL) {
-    if (is.null(assay)) assay <- Seurat::DefaultAssay(obj)
+    if (is.null(assay)) assay <- SeuratObject::DefaultAssay(obj)
 
     if (!isSeuratV5()) {
         return(Seurat::GetAssayData(obj, slot = layer, assay = assay))
