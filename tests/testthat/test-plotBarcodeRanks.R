@@ -90,3 +90,43 @@ test_that("the computed aesthetics reach the rendered point layer", {
     expect_equal(unique(built$data[[1]]$size), point$size)
     expect_equal(unique(built$data[[1]]$alpha), point$alpha)
 })
+
+# ---- DropletUtils versions -----------------------------------------------
+#
+# barcodeRanks() stopped returning a `fitted` column in DropletUtils 1.30.
+# The real function only ever shows one shape -- whichever version is
+# installed -- so both are built by hand here.
+
+fake_ranked <- function(fitted = TRUE) {
+    skip_if_not_installed("S4Vectors")
+    totals <- c(5000, 3000, 800, 40, 10, 0)
+    cols   <- list(rank = seq_along(totals), total = totals)
+    if (fitted) cols$fitted <- c(NA, 3100, 790, 42, NA, NA)
+    out <- do.call(S4Vectors::DataFrame, cols)
+    rownames(out) <- paste0("BC", seq_along(totals))
+    S4Vectors::metadata(out) <- list(knee = 3000, inflection = 800)
+    out
+}
+
+test_that("a barcodeRanks() result with no fitted column is summarised (DropletUtils >= 1.30)", {
+    res <- suppressMessages(summariseBarcodeRanks(fake_ranked(fitted = FALSE), "S1", "x.h5"))
+
+    expect_equal(nrow(res$data), 5)          # the zero-total barcode is dropped
+    expect_true(all(is.na(res$data$fitted)))
+    expect_equal(res$n_above_inflection, 3)
+})
+
+test_that("a barcodeRanks() result with a fitted column keeps it (DropletUtils < 1.30)", {
+    res <- suppressMessages(summariseBarcodeRanks(fake_ranked(fitted = TRUE), "S1", "x.h5"))
+
+    expect_equal(res$data$fitted, c(NA, 3100, 790, 42, NA))
+})
+
+test_that("the fitted line is drawn only when there is a spline to draw", {
+    with_fit    <- suppressMessages(summariseBarcodeRanks(fake_ranked(TRUE), "S1", "x.h5"))
+    without_fit <- suppressMessages(summariseBarcodeRanks(fake_ranked(FALSE), "S1", "x.h5"))
+
+    n_lines <- function(p) sum(vapply(p$layers, function(l) inherits(l$geom, "GeomLine"), logical(1)))
+    expect_equal(n_lines(barcodeRankPlot(with_fit, "S1")), 1)
+    expect_equal(n_lines(barcodeRankPlot(without_fit, "S1")), 0)
+})

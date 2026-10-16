@@ -1,8 +1,9 @@
 #' Barcode Rank ("Knee") Plots from Raw 10x Matrices
 #'
 #' Draws the standard barcode rank plot for one or more Cell Ranger runs: total
-#' UMI count against barcode rank on log-log axes, with the fitted spline and
-#' the knee and inflection points [DropletUtils::barcodeRanks()] identifies.
+#' UMI count against barcode rank on log-log axes, with the knee and
+#' inflection points [DropletUtils::barcodeRanks()] identifies (and, with
+#' older DropletUtils, the spline it fitted to find them).
 #' Takes the same `manifest` / `path` / `multi` arguments as
 #' [seuratFrom10x()], and returns both the plotted curve and the figure for
 #' every run.
@@ -20,9 +21,12 @@
 #'   \item{Points}{One per distinct total UMI count. Barcodes tying on total
 #'     share a rank and plot at one position, so the curve is drawn from a few
 #'     thousand points rather than the millions of barcodes behind it.}
-#'   \item{Fitted line}{The smooth spline `barcodeRanks()` fits to the curve;
-#'     the knee and inflection are derived from its derivatives. Undefined
-#'     below `lower`, so it stops short of the right-hand tail.}
+#'   \item{Fitted line}{DropletUtils before 1.30 only: the smooth spline
+#'     `barcodeRanks()` fits to the curve, whose derivatives give the knee and
+#'     inflection. Undefined below `lower`, so it stops short of the
+#'     right-hand tail. From 1.30, `barcodeRanks()` traces the curve directly
+#'     and fits no spline, so no line is drawn -- see *DropletUtils
+#'     versions*.}
 #'   \item{Knee}{Where the curve bends most sharply. The optimistic cutoff --
 #'     barcodes above it are cells by any reading.}
 #'   \item{Inflection}{Where the curve starts its final descent into the
@@ -42,11 +46,22 @@
 #' size of the manifest. [rawMatrixFrom10x()] is the function to reach for if
 #' you genuinely need the matrices themselves, and it makes no such promise.
 #'
+#' @section DropletUtils versions:
+#' The installed DropletUtils is detected from what `barcodeRanks()` returns.
+#' Its method for finding the knee changed twice. Before 1.28 it fitted a
+#' smoothing spline and took derivatives; 1.28 switched to the point farthest
+#' from a line between plateau and inflection; 1.30 replaced both with a
+#' curve-tracing algorithm and stopped returning the spline. So the knee, and
+#' sometimes the inflection, can move between versions on the same data, and
+#' `data$fitted` is `NA` from 1.30 on. The arguments `fit.bounds` and `df`
+#' only do anything before 1.30; from 1.30 the ones that tune the fit are
+#' `exclude.from`, `window` and `gradient.threshold`.
+#'
 #' @inheritParams seuratFrom10x
 #' @param lower Total UMI count at or below which a barcode is assumed to be
-#'   empty. Used by [DropletUtils::barcodeRanks()] to estimate the ambient
-#'   profile and to bound the spline fit; it does **not** filter the curve, and
-#'   barcodes below it are still plotted. Default `100`.
+#'   empty. [DropletUtils::barcodeRanks()] only looks above it when finding
+#'   the knee and inflection; it does **not** filter the curve, and barcodes
+#'   below it are still plotted. Default `100`.
 #' @param outdir Directory to write a CSV of the curve and a PNG of the figure
 #'   for each run, named `<run>_barcode_ranks.csv` / `.png`. Created if it does
 #'   not exist. `NULL` (default) writes nothing and returns everything in
@@ -54,13 +69,16 @@
 #' @param width,height,dpi Passed to [ggplot2::ggsave()] when `outdir` is
 #'   supplied. Ignored otherwise.
 #' @param ... Further arguments to [DropletUtils::barcodeRanks()], such as
-#'   `fit.bounds`, `exclude.from` or `df`.
+#'   `exclude.from`. Which others it accepts depends on the DropletUtils
+#'   version -- see *DropletUtils versions*.
 #'
 #' @return A named list with one element per run, each a list of:
 #'
 #'   \describe{
 #'     \item{`data`}{Data frame of the plotted curve: `barcode`, `rank`,
 #'       `total` and `fitted`, one row per distinct total, ordered by rank.
+#'       `fitted` is `NA` throughout with DropletUtils 1.30 or later, which
+#'       fits no spline.
 #'       Zero-count barcodes are dropped (they have no place on a log axis) and
 #'       ties are collapsed to one row, so this is far smaller than the raw
 #'       matrix -- small enough to write to CSV, which the full per-barcode
@@ -274,7 +292,10 @@ summariseBarcodeRanks <- function(ranked, ident, h5) {
         barcode = if (is.null(rownames(ranked))) NA_character_ else rownames(ranked),
         rank    = as.numeric(ranked$rank),
         total   = as.numeric(ranked$total),
-        fitted  = as.numeric(ranked$fitted),
+        #== DropletUtils >= 1.30 traces the curve instead of fitting a
+        #== spline, and returns no `fitted` column. as.numeric(NULL) is
+        #== length 0, which data.frame() cannot recycle, so fill with NA.
+        fitted  = if (is.null(ranked$fitted)) NA_real_ else as.numeric(ranked$fitted),
         stringsAsFactors = FALSE
     )
 
@@ -401,6 +422,17 @@ barcodeRankPlot <- function(result, ident) {
     #== be invisible at rank 10,000 and enormous at rank 1
     label_x <- min(curve$rank) * 1.2
 
+    #== No spline to draw from DropletUtils 1.30 on; NULL adds nothing to a
+    #== ggplot, so the rest of the figure is identical either way.
+    fitted_line <- if (any(!is.na(curve$fitted))) {
+        ggplot2::geom_line(
+            ggplot2::aes(y = .data$fitted),
+            colour    = .br_fitted,
+            linewidth = 0.7,
+            na.rm     = TRUE
+        )
+    }
+
     ggplot2::ggplot(curve, ggplot2::aes(x = .data$rank, y = .data$total)) +
         ggplot2::geom_point(
             colour = "grey45",
@@ -408,12 +440,7 @@ barcodeRankPlot <- function(result, ident) {
             alpha  = point$alpha,
             na.rm  = TRUE
         ) +
-        ggplot2::geom_line(
-            ggplot2::aes(y = .data$fitted),
-            colour    = .br_fitted,
-            linewidth = 0.7,
-            na.rm     = TRUE
-        ) +
+        fitted_line +
         #== Knee is always the higher of the two cutoffs, so its label goes
         #== above its line and the inflection's below its own; the pair stays
         #== legible even when the two nearly coincide.

@@ -209,8 +209,8 @@ names are left alone. `width`, `height` and `dpi` are passed through to
 ## Tuning the fit
 
 `lower` is the total UMI count at or below which a barcode is assumed empty.
-It sets the ambient profile and bounds the spline fit; it does **not** filter
-the curve, and barcodes below it are still plotted.
+Only barcodes above it are searched for the knee and inflection; it does
+**not** filter the curve, and barcodes below it are still plotted.
 
 ```{r lower}
 plotBarcodeRanks(path = outs, multi = FALSE, lower = 500)$heart_1k_v3$plot
@@ -223,15 +223,26 @@ plotBarcodeRanks(
   path         = outs,
   multi        = FALSE,
   lower        = 100,
-  fit.bounds   = NULL,
-  exclude.from = 50,
-  df           = 20
+  exclude.from = 50
 )
 ```
 
-Raise `df` for a stiffer spline if the fitted line is chasing noise in the
-tail; `exclude.from` drops the highest-ranked barcodes from the fit, which
-helps when a handful of enormous barcodes drag the knee upward.
+`exclude.from` drops the highest-ranked barcodes from the search, which helps
+when a handful of enormous barcodes drag the knee upward.
+
+Which other arguments do anything depends on your DropletUtils version,
+because `barcodeRanks()` changed how it finds the knee:
+
+| DropletUtils | How the knee is found | Arguments that tune it | Fitted line on the plot |
+|---|---|---|---|
+| before 1.28 | smoothing spline, then its derivatives | `fit.bounds`, `df` | yes |
+| 1.28 | spline; knee farthest from the plateau-to-inflection line | `fit.bounds`, `df` | yes |
+| 1.30 and later | curve tracing, no spline | `window`, `gradient.threshold` | no -- `data$fitted` is `NA` |
+
+`plotBarcodeRanks()` adapts to whichever is installed. But the same data can
+give a different knee, and sometimes a different inflection, under different
+versions, so record `packageVersion("DropletUtils")` alongside any cutoff you
+report.
 
 ## Changing the figure
 

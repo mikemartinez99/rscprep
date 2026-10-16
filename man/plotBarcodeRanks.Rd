@@ -31,9 +31,9 @@ rather than \verb{cellranger count} -- see the section above. Required when
 pipeline is read per-row from \code{manifest$multi} instead.}
 
 \item{lower}{Total UMI count at or below which a barcode is assumed to be
-empty. Used by \code{\link[DropletUtils:barcodeRanks]{DropletUtils::barcodeRanks()}} to estimate the ambient
-profile and to bound the spline fit; it does \strong{not} filter the curve, and
-barcodes below it are still plotted. Default \code{100}.}
+empty. \code{\link[DropletUtils:barcodeRanks]{DropletUtils::barcodeRanks()}} only looks above it when finding
+the knee and inflection; it does \strong{not} filter the curve, and barcodes
+below it are still plotted. Default \code{100}.}
 
 \item{outdir}{Directory to write a CSV of the curve and a PNG of the figure
 for each run, named \verb{<run>_barcode_ranks.csv} / \code{.png}. Created if it does
@@ -44,7 +44,8 @@ memory.}
 supplied. Ignored otherwise.}
 
 \item{...}{Further arguments to \code{\link[DropletUtils:barcodeRanks]{DropletUtils::barcodeRanks()}}, such as
-\code{fit.bounds}, \code{exclude.from} or \code{df}.}
+\code{exclude.from}. Which others it accepts depends on the DropletUtils
+version -- see \emph{DropletUtils versions}.}
 
 \item{multiplexed}{Deprecated. The former name of \code{multi}; still accepted,
 with a warning.}
@@ -55,6 +56,8 @@ A named list with one element per run, each a list of:
 \describe{
 \item{\code{data}}{Data frame of the plotted curve: \code{barcode}, \code{rank},
 \code{total} and \code{fitted}, one row per distinct total, ordered by rank.
+\code{fitted} is \code{NA} throughout with DropletUtils 1.30 or later, which
+fits no spline.
 Zero-count barcodes are dropped (they have no place on a log axis) and
 ties are collapsed to one row, so this is far smaller than the raw
 matrix -- small enough to write to CSV, which the full per-barcode
@@ -75,8 +78,9 @@ mode either raises an error instead.
 }
 \description{
 Draws the standard barcode rank plot for one or more Cell Ranger runs: total
-UMI count against barcode rank on log-log axes, with the fitted spline and
-the knee and inflection points \code{\link[DropletUtils:barcodeRanks]{DropletUtils::barcodeRanks()}} identifies.
+UMI count against barcode rank on log-log axes, with the knee and
+inflection points \code{\link[DropletUtils:barcodeRanks]{DropletUtils::barcodeRanks()}} identifies (and, with
+older DropletUtils, the spline it fitted to find them).
 Takes the same \code{manifest} / \code{path} / \code{multi} arguments as
 \code{\link[=seuratFrom10x]{seuratFrom10x()}}, and returns both the plotted curve and the figure for
 every run.
@@ -96,9 +100,12 @@ that run should be treated with suspicion.
 \item{Points}{One per distinct total UMI count. Barcodes tying on total
 share a rank and plot at one position, so the curve is drawn from a few
 thousand points rather than the millions of barcodes behind it.}
-\item{Fitted line}{The smooth spline \code{barcodeRanks()} fits to the curve;
-the knee and inflection are derived from its derivatives. Undefined
-below \code{lower}, so it stops short of the right-hand tail.}
+\item{Fitted line}{DropletUtils before 1.30 only: the smooth spline
+\code{barcodeRanks()} fits to the curve, whose derivatives give the knee and
+inflection. Undefined below \code{lower}, so it stops short of the
+right-hand tail. From 1.30, \code{barcodeRanks()} traces the curve directly
+and fits no spline, so no line is drawn -- see \emph{DropletUtils
+versions}.}
 \item{Knee}{Where the curve bends most sharply. The optimistic cutoff --
 barcodes above it are cells by any reading.}
 \item{Inflection}{Where the curve starts its final descent into the
@@ -119,6 +126,19 @@ is read, ranked, reduced to its curve, and released before the next is
 touched. Peak memory is therefore set by the largest single run, not by the
 size of the manifest. \code{\link[=rawMatrixFrom10x]{rawMatrixFrom10x()}} is the function to reach for if
 you genuinely need the matrices themselves, and it makes no such promise.
+}
+
+\section{DropletUtils versions}{
+
+The installed DropletUtils is detected from what \code{barcodeRanks()} returns.
+Its method for finding the knee changed twice. Before 1.28 it fitted a
+smoothing spline and took derivatives; 1.28 switched to the point farthest
+from a line between plateau and inflection; 1.30 replaced both with a
+curve-tracing algorithm and stopped returning the spline. So the knee, and
+sometimes the inflection, can move between versions on the same data, and
+\code{data$fitted} is \code{NA} from 1.30 on. The arguments \code{fit.bounds} and \code{df}
+only do anything before 1.30; from 1.30 the ones that tune the fit are
+\code{exclude.from}, \code{window} and \code{gradient.threshold}.
 }
 
 \examples{
