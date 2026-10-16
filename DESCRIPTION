@@ -10,6 +10,8 @@ Description: Reads Cell Ranger output into Seurat objects, annotates them
     interface, flags outlier cells by median absolute deviation either
     globally or within sample, and records the thresholds it applied so that
     what was removed, and why, stays inspectable afterwards.
+URL: https://mikemartinez99.github.io/rscprep/, https://github.com/mikemartinez99/rscprep
+BugReports: https://github.com/mikemartinez99/rscprep/issues
 License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

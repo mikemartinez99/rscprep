@@ -1,4 +1,13 @@
-url: ~
+url: https://mikemartinez99.github.io/rscprep/
 template:
   bootstrap: 5
 
+articles:
+- title: Workflow
+  navbar: Workflow
+  contents:
+  - seuratFrom10x
+  - includeMetadata
+  - mergeSeurat
+  - plotBarcodeRanks
+  - qcMetrics
