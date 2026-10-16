@@ -73,20 +73,20 @@
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mikemartinez99.github.io/rscprep/">rscprep</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://satijalab.org/seurat" class="external-link">Seurat</a></span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> handles the two shapes 10x Cell Ranger
-output actually comes in – standard single-sample
+<p><code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> is a helper function to efficiently read
+in single cell datasets from 10X. This function supports both 10X
+CellRanger output formats: standard single-sample
 <code>cellranger count</code> runs, and demuxed
-<code>cellranger multi</code> runs – behind one interface, so downstream
-code doesn’t need to branch on which one it’s looking at.</p>
-<p>You can point it at a single sample or run directly, or hand it a
-manifest describing a batch of runs from either pipeline. Either way, it
-returns a named list of Seurat objects, one per sample, ready to merge
-or process independently.</p>
-<p>The <code>multi</code> argument is the one thing you have to get
-right, and it asks which <em>pipeline</em> wrote the directory – not
-whether samples were pooled. See “Choosing <code>multi</code>” below if
-the run came off <code>cellranger multi</code> with a single sample in
-it, which is the usual shape for Flex and 5’.</p>
+<code>cellranger multi</code> runs.</p>
+<p>You can point it at a single sample or directory, or hand it a
+manifest file describing a batch of multiple runs from either pipeline
+or both. It returns a named list of Seurat objects, one per sample,
+ready to merge or process independently. Importantly, the package auto
+detects which version of Seurat you have to account for
+<code>SeuratObject</code> differences between v4 and v5.</p>
+<p>The <code>multi</code> argument controls how the function reads in
+your data. It tells the code which pipeline wrote the directory,
+<code>count</code> or <code>multi</code>.</p>
 <div class="section level2">
 <h2 id="a-cellranger-count-run">A <code>cellranger count</code> run<a class="anchor" aria-label="anchor" href="#a-cellranger-count-run"></a>
 </h2>
@@ -98,7 +98,7 @@ it, which is the usual shape for Flex and 5’.</p>
 <span></span>
 <span><span class="va">seurat_list</span><span class="op">$</span><span class="va">Sample_1</span></span></code></pre></div>
 <p><code>path</code> should point to the Cell Ranger <code>outs/</code>
-directory – the function looks for
+directory. The function then looks for
 <code>filtered_feature_bc_matrix.h5</code> directly inside it. The
 sample name is inferred from the parent folder (<code>Sample_1</code>,
 one level up from <code>outs</code>).</p>
@@ -119,7 +119,7 @@ directory holds every demuxed sample under
 <code>per_sample_outs/&lt;sample&gt;/</code>.
 <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> reads each sample’s
 <code>count/sample_filtered_feature_bc_matrix.h5</code> separately and
-returns one Seurat object per demuxed sample – a single function call
+returns one Seurat object per demuxed sample. A single function call
 here returns a list, not a single object.</p>
 </div>
 <div class="section level2">
@@ -137,19 +137,16 @@ here returns a list, not a single object.</p>
 <span></span>
 <span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span>, min.cells <span class="op">=</span> <span class="fl">3</span>, min.features <span class="op">=</span> <span class="fl">200</span><span class="op">)</span></span></code></pre></div>
 <p>The manifest needs a <code>Path</code> column (each row’s
-<code>outs/</code> directory) and a logical <code>multi</code> column.
-Rows can mix the two pipelines freely – each row is resolved
-independently, and a <code>multi = TRUE</code> row expands into one
-entry per demuxed sample in the returned list. If a sample’s expected H5
-file is missing, that row is skipped with a warning rather than failing
-the whole batch; single-path mode fails immediately instead, since
-there’s nothing left to fall back on.</p>
+<code>outs/</code> directory) and a logical <code>multi</code> column
+passed as a vector. Rows can mix the two pipelines freely. If a sample’s
+expected H5 file is missing, that row is skipped with a warning rather
+than failing the whole batch; single-path mode fails immediately
+instead, since there’s nothing left to fall back on.</p>
 </div>
 <div class="section level2">
 <h2 id="choosing-multi">Choosing <code>multi</code><a class="anchor" aria-label="anchor" href="#choosing-multi"></a>
 </h2>
-<p><code>multi</code> picks between two directory layouts, and the two
-Cell Ranger pipelines write different ones:</p>
+<p><code>multi</code> picks between two directory layouts.</p>
 <table class="table">
 <colgroup>
 <col width="33%">
@@ -176,25 +173,23 @@ Cell Ranger pipelines write different ones:</p>
 </table>
 <p>The question is which pipeline ran, not how many samples came out of
 it. <code>cellranger multi</code> writes <code>per_sample_outs/</code>
-even when it demultiplexed exactly one sample – routine for Flex and 5’
-– so those runs need <code>multi = TRUE</code> despite not being
-multiplexed in any biological sense. If you are unsure, look for
+even when it demultiplexed exactly one sample, so those runs need
+<code>multi = TRUE</code> despite not being multiplexed in any
+biological sense. If you are unsure, look for
 <code>per_sample_outs/</code> inside <code>outs/</code>: if it is there,
 the run needs <code>multi = TRUE</code>.</p>
-<p>This argument used to be called <code>multiplexed</code>, which read
-as a claim about the experiment rather than about the pipeline. The old
-name still works and warns.</p>
+<p><strong>This argument used to be called <code>multiplexed</code>,
+which read as a claim about the experiment rather than about the
+pipeline. The old name still works and warns.</strong></p>
 </div>
 <div class="section level2">
 <h2 id="notes">Notes<a class="anchor" aria-label="anchor" href="#notes"></a>
 </h2>
 <p><code>min.cells</code> and <code>min.features</code> are passed
 straight through to <code><a href="https://satijalab.github.io/seurat-object/reference/CreateSeuratObject.html" class="external-link">Seurat::CreateSeuratObject()</a></code> and apply
-uniformly across every sample in a batch – set them once at the level of
-granularity you actually want, not per-sample. The function forces
-classic (v4-style) Seurat assay objects internally regardless of which
-Seurat package version is installed, so results are consistent even in
-mixed-Seurat-version environments.</p>
+uniformly across every sample in a batch.</p>
+<p>The code auto-detects the Seurat version in your session and reads in
+as either classic assay or Assay5 accordingly.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

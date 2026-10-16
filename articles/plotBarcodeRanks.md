@@ -12,7 +12,7 @@ cells and a long tail of empty droplets means cell calling had an easy
 decision to make, and a shallow gradual slope means it did not.
 
 [`plotBarcodeRanks()`](https://mikemartinez99.github.io/rscprep/reference/plotBarcodeRanks.md)
-draws that plot. This vignette covers the simplest case – one biological
+draws that plot. This vignette covers the simplest case: one biological
 sample per GEM well, nothing multiplexed, where each curve describes
 exactly one sample and needs no caveats.
 
@@ -122,8 +122,8 @@ names(ranks)
 #> [1] "Sample_1" "Sample_2" "Sample_3"
 ```
 
-Runs are processed strictly one at a time – read, ranked, reduced to a
-curve, released – so peak memory is set by your largest single sample
+Runs are processed strictly one at a time (read, ranked, reduced to a
+curve, released), so peak memory is set by your largest single sample
 rather than by the length of the manifest. That matters here more than
 it looks: a raw matrix has a column for every barcode in the well, and
 holding a dozen of them at once is what makes this kind of loop fall
@@ -150,7 +150,7 @@ sample_1$h5                   # the file this was computed from
 (they have no place on a log axis, and in a raw matrix they are the
 clear majority) and barcodes tying on total are collapsed to one row,
 since they share a rank and plot at one point anyway. That turns
-millions of rows into a few thousand – small enough to write to CSV,
+millions of rows into a few thousand, small enough to write to CSV,
 which the full per-barcode table is not.
 
 ## The check this is actually for
@@ -190,7 +190,7 @@ ranks <- plotBarcodeRanks(manifest = manifest, outdir = "qc/barcode_ranks")
 Writes `<sample>_barcode_ranks.csv` and `<sample>_barcode_ranks.png` per
 sample, creating the directory if needed, and still returns everything
 in memory. Sample names come from directory names, so any character that
-is not safe in a filename is replaced with `_` in the file stem only –
+is not safe in a filename is replaced with `_` in the file stem only;
 the list names are left alone. `width`, `height` and `dpi` are passed
 through to
 [`ggplot2::ggsave()`](https://ggplot2.tidyverse.org/reference/ggsave.html).
@@ -256,7 +256,7 @@ ggplot(curves, aes(rank, total, colour = Sample)) +
 ```
 
 Overlaying samples this way is usually more informative than reading the
-per-sample figures side by side – a curve that sits below the others, or
+per-sample figures side by side: a curve that sits below the others, or
 turns over earlier, stands out immediately.
 
 ## When a sample fails
@@ -279,9 +279,9 @@ setdiff(basename(dirname(manifest$Path)), names(ranks))
 #> [1] "Sample_2"
 ```
 
-In `path` mode the same condition is an error instead – there is no
-other sample to fall back on, so failing quietly would leave you with an
-empty list and no explanation.
+In `path` mode the same condition is an error instead. There is no other
+sample to fall back on, so failing quietly would leave you with an empty
+list and no explanation.
 
 If the raw matrix is genuinely absent, the usual cause is that only the
 filtered outputs were copied off the sequencing core’s storage.
@@ -291,8 +291,8 @@ no way to reconstruct it from what you have, so it has to be fetched.
 ## Getting the matrices themselves
 
 [`plotBarcodeRanks()`](https://mikemartinez99.github.io/rscprep/reference/plotBarcodeRanks.md)
-never hands you a raw matrix – it reads each one, ranks it, and drops
-it. If you want the matrices,
+never hands you a raw matrix. It reads each one, ranks it, and drops it.
+If you want the matrices,
 [`rawMatrixFrom10x()`](https://mikemartinez99.github.io/rscprep/reference/rawMatrixFrom10x.md)
 takes the same arguments and returns them, with no such promise about
 memory:

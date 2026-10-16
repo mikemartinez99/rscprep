@@ -73,48 +73,15 @@
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mikemartinez99.github.io/rscprep/">rscprep</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://satijalab.org/seurat" class="external-link">Seurat</a></span><span class="op">)</span></span></code></pre></div>
-<p>Treatment group, genotype, timepoint – the things you actually want
-to compare – have to get attached to the objects somewhere.
-<code><a href="../reference/includeMetadata.html">includeMetadata()</a></code> does that from a sample-level table,
-keyed on the names of the list <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> returns.</p>
-<div class="section level2">
-<h2 id="why-not-just-put-it-in-the-manifest">Why not just put it in the manifest?<a class="anchor" aria-label="anchor" href="#why-not-just-put-it-in-the-manifest"></a>
-</h2>
-<p>Because the manifest is a different kind of table. Its rows are Cell
-Ranger <strong>runs</strong> – one per <code>outs/</code> directory.
-Treatment is a property of a <strong>sample</strong>. For a plain
-<code>cellranger count</code> run those happen to coincide, so it is
-tempting to add a <code>Treatment</code> column and be done:</p>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">manifest</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  Path        <span class="op">=</span> <span class="st">"/path/to/Sample_1/outs"</span>,</span>
-<span>  multi <span class="op">=</span> <span class="cn">FALSE</span>,</span>
-<span>  Treatment   <span class="op">=</span> <span class="st">"Control"</span>     <span class="co"># works here, and only here</span></span>
-<span><span class="op">)</span></span></code></pre></div>
-<p>But a multiplexed run breaks it. One row of the manifest, one
-<code>outs/</code> directory, and eight demuxed samples inside it –
-possibly four controls and four treated. There is no way to write four
-values in one cell that isn’t a delimited string you then have to parse
-and validate.</p>
-<p>So the two tables stay separate, at their own grain:</p>
-<ul>
-<li>
-<strong>manifest</strong> – run-level: <code>Path</code>,
-<code>multi</code>, and legitimately things like <code>Batch</code> or
-<code>RunDate</code> that really do apply to the whole run.</li>
-<li>
-<strong>sample sheet</strong> – sample-level: one row per sample,
-however many runs they came from.</li>
-</ul>
-<p>By the time <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> hands you a list, every
-entry is one sample and the multiplexed/non-multiplexed distinction has
-been erased. That is the right moment to attach sample-level metadata,
-and it is the same code path either way.</p>
-</div>
+<p>Attaching metadata columns that inform information like treatment
+group, genotype, timepoint and any other sample-level information have
+to get attached to the objects manually. <code><a href="../reference/includeMetadata.html">includeMetadata()</a></code>
+does that from a sample-level table, keyed on the names of the list
+<code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> returns.</p>
 <div class="section level2">
 <h2 id="the-workflow">The workflow<a class="anchor" aria-label="anchor" href="#the-workflow"></a>
 </h2>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span></span>
 <span>  path        <span class="op">=</span> <span class="st">"/path/to/Pool1/outs"</span>,</span>
 <span>  multi <span class="op">=</span> <span class="cn">TRUE</span></span>
@@ -123,7 +90,7 @@ and it is the same code path either way.</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "Bleo_18_Slim_10" "Bleo_22_Slim_14" "Ctrl_04_Slim_02" "Ctrl_09_Slim_07"</span></span></code></pre></div>
 <p>Those names are what you key on. Write a sheet against them:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sheet</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  Sample    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Bleo_18_Slim_10"</span>, <span class="st">"Bleo_22_Slim_14"</span>,</span>
 <span>                <span class="st">"Ctrl_04_Slim_02"</span>, <span class="st">"Ctrl_09_Slim_07"</span><span class="op">)</span>,</span>
@@ -133,128 +100,18 @@ and it is the same code path either way.</p>
 <span></span>
 <span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sheet</span><span class="op">)</span></span>
 <span><span class="co">#&gt; ✔ Added 2 metadata columns to 4 objects: "Treatment" and "Timepoint"</span></span></code></pre></div>
-<p>In practice the sheet lives in a CSV next to your analysis, filled in
-by whoever ran the experiment and kept under version control:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<p>In practice this sample sheet can live in your folder as a csv and be
+read in directly.</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sheet</span>     <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/utils/read.table.html" class="external-link">read.csv</a></span><span class="op">(</span><span class="st">"samplesheet.csv"</span><span class="op">)</span></span>
 <span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sheet</span><span class="op">)</span></span></code></pre></div>
 <p>Each column is broadcast across every cell of its sample, so after
 merging you can group by it directly:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">annotated</span><span class="op">)</span></span>
-<span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">merged</span><span class="op">$</span><span class="va">Ident</span>, <span class="va">merged</span><span class="op">$</span><span class="va">Treatment</span><span class="op">)</span></span></code></pre></div>
-<p>You don’t have to know the sample names in advance –
-<code>per_sample_outs/</code> does. Load first, read
-<code>names(seurat_list)</code>, and write the sheet against what is
-actually there. Discovery is automatic; the assignment stays
-explicit.</p>
-<div class="section level3">
-<h3 id="identifying-samples-by-rownames">Identifying samples by rownames<a class="anchor" aria-label="anchor" href="#identifying-samples-by-rownames"></a>
-</h3>
-<p>A <code>Sample</code> column is the primary key because it survives a
-CSV round trip. Rownames work too, and are used whenever there is no
-<code>Sample</code> column:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">sheet</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>Treatment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Bleomycin"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">sheet</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sheet</span><span class="op">)</span></span></code></pre></div>
-<p>If both are present the column wins. A data frame with neither – so,
-default <code>1, 2, 3</code> rownames – is rejected rather than matched
-positionally, because lining rows up by position against a list whose
-order you did not choose is a silent way to mislabel an entire
-experiment.</p>
 </div>
-</div>
-<div class="section level2">
-<h2 id="every-column-every-sample">Every column, every sample<a class="anchor" aria-label="anchor" href="#every-column-every-sample"></a>
-</h2>
-<p>The rule <code><a href="../reference/includeMetadata.html">includeMetadata()</a></code> enforces is that a column,
-once present, is populated for <strong>all</strong> samples. A sample
-with no row is an error. So is an <code>NA</code>, an empty cell, or a
-whitespace-only cell:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">sheet</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  Sample    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span>, <span class="st">"Sample_C"</span><span class="op">)</span>,</span>
-<span>  Treatment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="cn">NA</span>, <span class="st">"Bleomycin"</span><span class="op">)</span>,</span>
-<span>  Timepoint <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="cn">NA</span>, <span class="st">"D21"</span>, <span class="st">""</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sheet</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Error:</span></span>
-<span><span class="co">#&gt; Every column of `metadata` must be populated for every sample.</span></span>
-<span><span class="co">#&gt; ✖ Treatment: missing for "Sample_B"</span></span>
-<span><span class="co">#&gt; ✖ Timepoint: missing for "Sample_A" and "Sample_C"</span></span>
-<span><span class="co">#&gt; ℹ A column left blank for some samples becomes `NA` for their cells after</span></span>
-<span><span class="co">#&gt;   `mergeSeurat()`.</span></span></code></pre></div>
-<p>Every offending column is reported at once, so a forty-sample sheet
-gets fixed in one pass rather than forty.</p>
-<p>This strictness exists because the alternative is silent.
-<code>Seurat::merge()</code> will happily combine an object carrying a
-<code>Treatment</code> column with one that doesn’t – it fills the gap
-with <code>NA</code> and says nothing:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">annotated</span>   <span class="op">&lt;-</span> <span class="va">seurat_list</span><span class="op">$</span><span class="va">Sample_A</span></span>
-<span><span class="va">unannotated</span> <span class="op">&lt;-</span> <span class="va">seurat_list</span><span class="op">$</span><span class="va">Sample_B</span></span>
-<span><span class="va">annotated</span><span class="op">$</span><span class="va">Treatment</span> <span class="op">&lt;-</span> <span class="st">"Control"</span></span>
-<span></span>
-<span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">annotated</span>, <span class="va">unannotated</span>, add.cell.id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">merged</span><span class="op">$</span><span class="va">Treatment</span>, useNA <span class="op">=</span> <span class="st">"ifany"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Control    &lt;NA&gt;</span></span>
-<span><span class="co">#&gt;    4821    5104</span></span></code></pre></div>
-<p>Those <code>NA</code> cells then quietly drop out of every grouped
-comparison downstream. By the time you notice a group is short, the
-cause is several steps back. Requiring completeness up front makes the
-state unreachable.</p>
-</div>
-<div class="section level2">
-<h2 id="master-sheets">Master sheets<a class="anchor" aria-label="anchor" href="#master-sheets"></a>
-</h2>
-<p>Rows that match no loaded object are ignored with a warning, so one
-sheet can describe a whole experiment while you work on a subset:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># sheet covers all 40 samples; only Pool1's 4 are loaded</span></span>
-<span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">master_sheet</span><span class="op">)</span></span>
-<span><span class="co">#&gt; ! Ignoring 36 rows of `metadata` matching no object in `objList`: ...</span></span>
-<span><span class="co">#&gt; ✔ Added 2 metadata columns to 4 objects: "Treatment" and "Timepoint"</span></span></code></pre></div>
-<p>A typo is still caught, because a mistyped name in the sheet leaves
-some object without a row – and that is a hard error, not a warning.</p>
-</div>
-<div class="section level2">
-<h2 id="two-smaller-rules">Two smaller rules<a class="anchor" aria-label="anchor" href="#two-smaller-rules"></a>
-</h2>
-<p><strong>Existing columns are protected.</strong> Re-running against
-an edited sheet errors unless you opt in:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">annotated</span>, <span class="va">corrected_sheet</span>, overwrite <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
-<p><code>Ident</code> is reserved and cannot be set at all, even with
-<code>overwrite = TRUE</code> – it identifies the sample of origin and
-is what <code><a href="../reference/mergeSeurat.html">mergeSeurat()</a></code> verifies after merging.</p>
-<p><strong>Column names must be syntactically valid.</strong> Seurat
-quietly runs <code><a href="https://rdrr.io/r/base/make.names.html" class="external-link">make.names()</a></code> on metadata column names, so
-<code>Cell Type</code> would land as <code>Cell.Type</code> and stop
-matching the header in your sheet. <code><a href="../reference/includeMetadata.html">includeMetadata()</a></code>
-refuses instead, and tells you what the name would have become. Note
-that <code><a href="https://rdrr.io/r/utils/read.table.html" class="external-link">read.csv()</a></code> already does this conversion for you by
-default, so it rarely comes up.</p>
-</div>
-<div class="section level2">
-<h2 id="a-note-on-factors">A note on factors<a class="anchor" aria-label="anchor" href="#a-note-on-factors"></a>
-</h2>
-<p>Column types are preserved, factors included – each object keeps the
-sheet’s full level set, not just the level it happens to carry, so
-per-sample subsets stay comparable.</p>
-<p>That survives on the list but <strong>not</strong> through a merge:
-<code>Seurat::merge()</code> flattens factors to character. If you want
-an ordered factor on the merged object, re-apply it afterwards:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">annotated</span><span class="op">)</span></span>
-<span><span class="va">merged</span><span class="op">$</span><span class="va">Treatment</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">merged</span><span class="op">$</span><span class="va">Treatment</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Bleomycin"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
-</div>
-  </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
-    </nav></aside>
+  </main>
 </div>
 
 

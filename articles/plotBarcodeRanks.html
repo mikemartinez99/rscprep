@@ -78,7 +78,7 @@ barcode rank on log-log axes: a sharp cliff between a plateau of real
 cells and a long tail of empty droplets means cell calling had an easy
 decision to make, and a shallow gradual slope means it did not.</p>
 <p><code><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks()</a></code> draws that plot. This vignette covers
-the simplest case – one biological sample per GEM well, nothing
+the simplest case: one biological sample per GEM well, nothing
 multiplexed, where each curve describes exactly one sample and needs no
 caveats.</p>
 <p><code>DropletUtils</code> does the ranking and is a
@@ -206,8 +206,8 @@ both halves of the workflow:</p>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">ranks</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "Sample_1" "Sample_2" "Sample_3"</span></span></code></pre></div>
-<p>Runs are processed strictly one at a time – read, ranked, reduced to
-a curve, released – so peak memory is set by your largest single sample
+<p>Runs are processed strictly one at a time (read, ranked, reduced to a
+curve, released), so peak memory is set by your largest single sample
 rather than by the length of the manifest. That matters here more than
 it looks: a raw matrix has a column for every barcode in the well, and
 holding a dozen of them at once is what makes this kind of loop fall
@@ -231,8 +231,8 @@ over.</p>
 barcodes are dropped (they have no place on a log axis, and in a raw
 matrix they are the clear majority) and barcodes tying on total are
 collapsed to one row, since they share a rank and plot at one point
-anyway. That turns millions of rows into a few thousand – small enough
-to write to CSV, which the full per-barcode table is not.</p>
+anyway. That turns millions of rows into a few thousand, small enough to
+write to CSV, which the full per-barcode table is not.</p>
 </div>
 <div class="section level2">
 <h2 id="the-check-this-is-actually-for">The check this is actually for<a class="anchor" aria-label="anchor" href="#the-check-this-is-actually-for"></a>
@@ -268,8 +268,8 @@ discrepancy you believe.</p>
 <code>&lt;sample&gt;_barcode_ranks.png</code> per sample, creating the
 directory if needed, and still returns everything in memory. Sample
 names come from directory names, so any character that is not safe in a
-filename is replaced with <code>_</code> in the file stem only – the
-list names are left alone. <code>width</code>, <code>height</code> and
+filename is replaced with <code>_</code> in the file stem only; the list
+names are left alone. <code>width</code>, <code>height</code> and
 <code>dpi</code> are passed through to
 <code><a href="https://ggplot2.tidyverse.org/reference/ggsave.html" class="external-link">ggplot2::ggsave()</a></code>.</p>
 </div>
@@ -321,8 +321,8 @@ across every sample is one <code>rbind</code> away:</p>
 <span>  <span class="fu"><a href="https://ggplot2.tidyverse.org/reference/labs.html" class="external-link">labs</a></span><span class="op">(</span>x <span class="op">=</span> <span class="st">"Barcode rank"</span>, y <span class="op">=</span> <span class="st">"Total UMI count"</span><span class="op">)</span> <span class="op">+</span></span>
 <span>  <span class="fu"><a href="../reference/theme_prepro.html">theme_prepro</a></span><span class="op">(</span><span class="st">"airy"</span><span class="op">)</span></span></code></pre></div>
 <p>Overlaying samples this way is usually more informative than reading
-the per-sample figures side by side – a curve that sits below the
-others, or turns over earlier, stands out immediately.</p>
+the per-sample figures side by side: a curve that sits below the others,
+or turns over earlier, stands out immediately.</p>
 </div>
 <div class="section level2">
 <h2 id="when-a-sample-fails">When a sample fails<a class="anchor" aria-label="anchor" href="#when-a-sample-fails"></a>
@@ -340,8 +340,8 @@ manifest:</p>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/sets.html" class="external-link">setdiff</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">basename</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/basename.html" class="external-link">dirname</a></span><span class="op">(</span><span class="va">manifest</span><span class="op">$</span><span class="va">Path</span><span class="op">)</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">ranks</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; [1] "Sample_2"</span></span></code></pre></div>
-<p>In <code>path</code> mode the same condition is an error instead –
-there is no other sample to fall back on, so failing quietly would leave
+<p>In <code>path</code> mode the same condition is an error instead.
+There is no other sample to fall back on, so failing quietly would leave
 you with an empty list and no explanation.</p>
 <p>If the raw matrix is genuinely absent, the usual cause is that only
 the filtered outputs were copied off the sequencing core’s storage.
@@ -352,7 +352,7 @@ to be fetched.</p>
 <div class="section level2">
 <h2 id="getting-the-matrices-themselves">Getting the matrices themselves<a class="anchor" aria-label="anchor" href="#getting-the-matrices-themselves"></a>
 </h2>
-<p><code><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks()</a></code> never hands you a raw matrix – it
+<p><code><a href="../reference/plotBarcodeRanks.html">plotBarcodeRanks()</a></code> never hands you a raw matrix. It
 reads each one, ranks it, and drops it. If you want the matrices,
 <code><a href="../reference/rawMatrixFrom10x.html">rawMatrixFrom10x()</a></code> takes the same arguments and returns
 them, with no such promise about memory:</p>

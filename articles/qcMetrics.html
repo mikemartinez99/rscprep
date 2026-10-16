@@ -75,8 +75,8 @@
 <p>Two functions, in order. <code><a href="../reference/diagnoseQC.html">diagnoseQC()</a></code> calculates the
 per-cell metrics that filtering decisions get made from;
 <code><a href="../reference/flagQC.html">flagQC()</a></code> marks the cells those metrics say are outliers.
-Neither one removes anything – the split is deliberate, so that you can
-look at what a threshold would cut before you cut it.</p>
+Neither one removes anything. The motivation here is that you can look
+at what a threshold would remove before you actually remove it.</p>
 <p>This vignette picks up where <a href="mergeSeurat.html"><code>mergeSeurat()</code></a> leaves off:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span><span class="op">)</span></span>
@@ -109,47 +109,27 @@ already wrote:</p>
 <span><span class="co">#&gt; Sample_1_Cell4        454          316  15.639   3.304            0.941</span></span></code></pre></div>
 <ul>
 <li>
-<strong><code>pctMito</code></strong> – share of a cell’s UMIs
-coming from mitochondrial genes. High means the cell lost cytoplasmic
-RNA through a ruptured membrane, so this is the usual first filter. What
+<strong><code>pctMito</code></strong>: share of a cell’s UMIs coming
+from mitochondrial genes. High means the cell lost cytoplasmic RNA
+through a ruptured membrane, so this is the usual first filter. What
 counts as high is tissue-dependent: 5–10% is a common starting point,
 but cardiac, muscle and kidney are legitimately mitochondria-rich and a
 fixed cutoff throws away real cells.</li>
 <li>
-<strong><code>pctRibo</code></strong> – share from ribosomal protein
+<strong><code>pctRibo</code></strong>: share from ribosomal protein
 genes. Rarely a hard filter, because it varies strongly by cell type.
 Useful as a comparison between samples that ought to look alike: a sharp
 shift points at something technical.</li>
 <li>
-<strong><code>log10GenesPerUMI</code></strong> – library complexity,
+<strong><code>log10GenesPerUMI</code></strong>: library complexity,
 <code>log10(nFeature) / log10(nCount)</code>. Between 0 and 1 for real
 cells; low means a library dominated by few transcripts. Around 0.8 is a
 conventional floor.</li>
 </ul>
 <p>The percentages come from matching gene <strong>symbols</strong>
 against organism-specific patterns, so <code>organism</code> has to
-match the data.</p>
-</div>
-<div class="section level2">
-<h2 id="when-the-patterns-match-nothing">When the patterns match nothing<a class="anchor" aria-label="anchor" href="#when-the-patterns-match-nothing"></a>
-</h2>
-<p>Get the organism wrong and both columns come back as zeroes. That is
-loud rather than silent:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/diagnoseQC.html">diagnoseQC</a></span><span class="op">(</span><span class="va">seurat</span>, organism <span class="op">=</span> <span class="st">"hsa"</span><span class="op">)</span>   <span class="co"># mouse data</span></span>
-<span><span class="co">#&gt; Warning:</span></span>
-<span><span class="co">#&gt; ! mito pattern "^MT-" matched 0 features for organism "hsa".</span></span>
-<span><span class="co">#&gt; ℹ Check that rownames are gene symbols and not Ensembl IDs --</span></span>
-<span><span class="co">#&gt;   `head(rownames(seurat))` will show which.</span></span>
-<span><span class="co">#&gt; ℹ pctMito will be 0 for every cell.</span></span>
-<span><span class="co">#&gt; ✔ Added 3 QC metrics to 1200 cells.</span></span>
-<span><span class="co">#&gt; • pctMito: median 0%, max 0%</span></span></code></pre></div>
-<p>The same warning fires when the organism is right but the matrix is
-still keyed by Ensembl IDs, which is the other common cause –
-<code>ENSMUSG00000064341</code> matches no symbol pattern. Convert the
-rownames to symbols before diagnosing.</p>
-<p>Four organisms are supported, differing only in the capitalisation
-convention their symbols follow:</p>
+match the data. The package currently supports mouse, rat, human, and
+zebrafish.</p>
 <table class="table">
 <thead><tr class="header">
 <th>code</th>
@@ -193,15 +173,12 @@ shares.</p>
 <p><code>doCellCycle = TRUE</code> also hands the object to
 <code><a href="../reference/runCellCycle.html">runCellCycle()</a></code>, adding <code>S.Score</code>,
 <code>G2M.Score</code> and <code>Phase</code>:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/diagnoseQC.html">diagnoseQC</a></span><span class="op">(</span><span class="va">seurat</span>, organism <span class="op">=</span> <span class="st">"mmu"</span>, doCellCycle <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>It is off by default because, unlike the metrics above, scoring
-assumes normalised data – and will run
+assumes normalized data, and will run
 <code><a href="https://satijalab.org/seurat/reference/NormalizeData.html" class="external-link">Seurat::NormalizeData()</a></code> on the object itself, with a
-warning, if it arrives raw. For a non-human organism it also needs
-<code>orthogene</code> to convert the marker lists. See
-<code><a href="../reference/runCellCycle.html">?runCellCycle</a></code> for the detail, including the
-<code>method</code> argument for machines without network access.</p>
+warning, if it arrives raw.</p>
 </div>
 <div class="section level2">
 <h2 id="flagging-outliers">Flagging outliers<a class="anchor" aria-label="anchor" href="#flagging-outliers"></a>
@@ -209,11 +186,11 @@ warning, if it arrives raw. For a non-human organism it also needs
 <p><code><a href="../reference/flagQC.html">flagQC()</a></code> marks cells that sit an unusual distance from
 the rest, using the median absolute deviation rather than a fixed
 cutoff:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, metrics <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span>, pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Each entry is <code>column = bound</code>, and the bound is per
-metric because which tail matters depends on the metric.
-<code>nCount_RNA</code> wants <code>"lower"</code> – the low tail is
+metric because which outlier tail matters depends on the metric.
+<code>nCount_RNA</code> wants <code>"lower"</code>: the low tail is
 empty droplets and dying cells, while the high tail is mostly real,
 well-captured cells. <code>pctMito</code> wants <code>"higher"</code>,
 since high is bad and low is not. <code>"both"</code> is the default,
@@ -229,11 +206,11 @@ will call the failure normal and flag the survivors.</p>
 </h2>
 <p>This is the argument that matters most. By default
 <code><a href="../reference/flagQC.html">flagQC()</a></code> estimates one threshold across every cell in the
-object. If your samples differ in sequencing depth – and they usually do
-– that single threshold describes none of them.</p>
+object. If your samples differ in sequencing depth (and they usually
+do), that single threshold describes none of them.</p>
 <p>Here are three mouse samples at median depths of roughly 2,500, 6,800
 and 25,000 UMIs. Globally:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">global</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span>, pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="co">#&gt; ℹ Flagging outliers in 2 metrics at 3 MADs from the median (log2 scale), across all cells.</span></span>
 <span><span class="co">#&gt; ℹ nCount_RNA: 0/1200 cells flagged (0%).</span></span>
@@ -245,7 +222,7 @@ and catches nothing</strong>. Pooling three depth tiers inflates the
 spread so far that the cutoff falls below every real cell in the
 experiment, including the dying ones it exists to find.</p>
 <p>Now per sample:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span>,</span>
 <span>  metrics  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span>, pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>,</span>
@@ -256,7 +233,7 @@ experiment, including the dying ones it exists to find.</p>
 <span><span class="co">#&gt; • lower: &lt; 2400-24910 -- 64 cells</span></span>
 <span><span class="co">#&gt; ℹ pctMito: 62/1200 cells flagged (5.17%) across 3 groups.</span></span>
 <span><span class="co">#&gt; • upper: &gt; 1.182-1.858 -- 62 cells</span></span></code></pre></div>
-<p>Three thresholds instead of one – 2,400, 6,512 and 24,910 – and the
+<p>Three thresholds instead of one (2,400, 6,512 and 24,910), and the
 low-count cells in every sample get found. The console prints the
 <em>range</em> across groups rather than a line per group, so a
 twenty-sample object stays readable; the per-group numbers are in the
@@ -275,7 +252,7 @@ no-op. That is worth checking rather than assuming.</p>
 </h2>
 <p>Every call records what it did. <code><a href="../reference/getOutlierSummary.html">getOutlierSummary()</a></code>
 reads it back:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/getOutlierSummary.html">getOutlierSummary</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span></span>
 <span><span class="va">qc</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"metric"</span>, <span class="st">"group"</span>, <span class="st">"lower"</span>, <span class="st">"upper"</span>, <span class="st">"n_flagged"</span>, <span class="st">"pct_flagged"</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt;       metric    group     lower    upper n_flagged pct_flagged</span></span>
@@ -297,7 +274,7 @@ against. The same applies to <code>n_lower</code> /
 <code>n_upper</code>.</li>
 </ul>
 <p>Which sample is losing the most cells?</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">qc</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="op">-</span><span class="va">qc</span><span class="op">$</span><span class="va">pct_flagged</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"metric"</span>, <span class="st">"group"</span>, <span class="st">"n_flagged"</span>, <span class="st">"pct_flagged"</span><span class="op">)</span><span class="op">]</span></span>
 <span><span class="co">#&gt;       metric    group n_flagged pct_flagged</span></span>
 <span><span class="co">#&gt; 3 nCount_RNA Sample_3        30         7.5</span></span>
@@ -309,7 +286,7 @@ against. The same applies to <code>n_lower</code> /
 <p>Repeated calls accumulate into this one table, so an object flagged
 on counts globally and then on mitochondrial content per sample yields a
 single table describing both. It is a record written at flag time, not a
-live view – cell counts describe the object as it stood then, which is
+live view. Cell counts describe the object as it stood then, which is
 the point, since being able to say afterwards how many cells were
 dropped and why is the reason to keep it.</p>
 </div>
@@ -320,7 +297,7 @@ dropped and why is the reason to keep it.</p>
 not have. A group of two cells has no usable spread, and a group where
 over half the cells share one value has a MAD of zero. Both are skipped
 rather than given a meaningless threshold:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span><span class="op">)</span>, group_by <span class="op">=</span> <span class="st">"Ident"</span><span class="op">)</span></span>
 <span><span class="co">#&gt; Warning:</span></span>
 <span><span class="co">#&gt; ! nCount_RNA: no threshold for 1 of 3 Ident groups.</span></span>
@@ -332,17 +309,17 @@ groups still get a row in the summary table, with <code>NA</code>
 thresholds and an <code>NA</code> <code>column</code>, so nothing
 silently disappears.</p>
 <p>That <code>NA</code>-not-<code>FALSE</code> distinction runs
-throughout. A cell is left <code>NA</code> when it was never judged –
-missing metric, missing <code>group_by</code> value, or a skipped group
-– so an unjudged cell is never mistaken for one that passed. It matters
-at the filtering step below.</p>
+throughout. A cell is left <code>NA</code> when it was never judged
+(missing metric, missing <code>group_by</code> value, or a skipped
+group), so an unjudged cell is never mistaken for one that passed. It
+matters at the filtering step below.</p>
 </div>
 <div class="section level2">
 <h2 id="actually-filtering">Actually filtering<a class="anchor" aria-label="anchor" href="#actually-filtering"></a>
 </h2>
 <p><code><a href="../reference/flagQC.html">flagQC()</a></code> writes logical columns and stops. Filtering is
 yours:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">flags</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"_outliers$"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">@</span><span class="va">meta.data</span><span class="op">)</span>, value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">flags</span></span>
 <span><span class="co">#&gt; [1] "nCount_RNA_3_lower_outliers" "pctMito_3_higher_outliers"</span></span>
@@ -364,13 +341,13 @@ failed, or it may be a genuinely different tissue where the thresholds
 do not transfer.</p>
 <p>You do not have to trust every flag. The columns are independent, so
 filter on the subset you believe:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">filtered</span> <span class="op">&lt;-</span> <span class="va">seurat</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="op">!</span><span class="va">seurat</span><span class="op">$</span><span class="va">pctMito_3_higher_outliers</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="tuning">Tuning<a class="anchor" aria-label="anchor" href="#tuning"></a>
 </h2>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># more aggressive</span></span>
 <span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>, nmads <span class="op">=</span> <span class="fl">2.5</span>, group_by <span class="op">=</span> <span class="st">"Ident"</span><span class="op">)</span></span>
 <span></span>
@@ -383,7 +360,7 @@ filter on the subset you believe:</p>
 and <code>nmads = 5</code> produce separate columns and can be compared
 side by side. <code>group_by</code> is <strong>not</strong> in the name,
 so re-running one metric with different grouping overwrites the previous
-flags – the summary table is updated to match, so it never describes a
+flags. The summary table is updated to match, so it never describes a
 column that is no longer there.</p>
 <p><code>log = TRUE</code> is the default and is right for count
 metrics, which are right-skewed enough that the median and MAD are
@@ -393,7 +370,7 @@ symmetric.</p>
 <div class="section level2">
 <h2 id="where-this-leaves-you">Where this leaves you<a class="anchor" aria-label="anchor" href="#where-this-leaves-you"></a>
 </h2>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/diagnoseQC.html">diagnoseQC</a></span><span class="op">(</span><span class="va">seurat</span>, organism <span class="op">=</span> <span class="st">"mmu"</span><span class="op">)</span></span>
 <span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span></span>
@@ -407,8 +384,8 @@ symmetric.</p>
 <p>Nothing has been removed at this point. The metrics are on the
 object, the flags are on the object, and the record of how the
 thresholds were chosen is on the object. Deciding what to drop is the
-next step, and it is a judgement call – which is why these functions
-stop short of making it.</p>
+next step, and it is a judgement call, which is why these functions stop
+short of making it.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>

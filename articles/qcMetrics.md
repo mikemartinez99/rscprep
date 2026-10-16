@@ -10,8 +10,8 @@ Two functions, in order.
 calculates the per-cell metrics that filtering decisions get made from;
 [`flagQC()`](https://mikemartinez99.github.io/rscprep/reference/flagQC.md)
 marks the cells those metrics say are outliers. Neither one removes
-anything – the split is deliberate, so that you can look at what a
-threshold would cut before you cut it.
+anything. The motivation here is that you can look at what a threshold
+would remove before you actually remove it.
 
 This vignette picks up where
 [`mergeSeurat()`](https://mikemartinez99.github.io/rscprep/articles/mergeSeurat.md)
@@ -55,48 +55,24 @@ head(seurat@meta.data[, c("nCount_RNA", "nFeature_RNA",
 #> Sample_1_Cell4        454          316  15.639   3.304            0.941
 ```
 
-- **`pctMito`** – share of a cell’s UMIs coming from mitochondrial
-  genes. High means the cell lost cytoplasmic RNA through a ruptured
-  membrane, so this is the usual first filter. What counts as high is
+- **`pctMito`**: share of a cell’s UMIs coming from mitochondrial genes.
+  High means the cell lost cytoplasmic RNA through a ruptured membrane,
+  so this is the usual first filter. What counts as high is
   tissue-dependent: 5–10% is a common starting point, but cardiac,
   muscle and kidney are legitimately mitochondria-rich and a fixed
   cutoff throws away real cells.
-- **`pctRibo`** – share from ribosomal protein genes. Rarely a hard
+- **`pctRibo`**: share from ribosomal protein genes. Rarely a hard
   filter, because it varies strongly by cell type. Useful as a
   comparison between samples that ought to look alike: a sharp shift
   points at something technical.
-- **`log10GenesPerUMI`** – library complexity,
+- **`log10GenesPerUMI`**: library complexity,
   `log10(nFeature) / log10(nCount)`. Between 0 and 1 for real cells; low
   means a library dominated by few transcripts. Around 0.8 is a
   conventional floor.
 
 The percentages come from matching gene **symbols** against
-organism-specific patterns, so `organism` has to match the data.
-
-## When the patterns match nothing
-
-Get the organism wrong and both columns come back as zeroes. That is
-loud rather than silent:
-
-``` r
-
-seurat <- diagnoseQC(seurat, organism = "hsa")   # mouse data
-#> Warning:
-#> ! mito pattern "^MT-" matched 0 features for organism "hsa".
-#> ℹ Check that rownames are gene symbols and not Ensembl IDs --
-#>   `head(rownames(seurat))` will show which.
-#> ℹ pctMito will be 0 for every cell.
-#> ✔ Added 3 QC metrics to 1200 cells.
-#> • pctMito: median 0%, max 0%
-```
-
-The same warning fires when the organism is right but the matrix is
-still keyed by Ensembl IDs, which is the other common cause –
-`ENSMUSG00000064341` matches no symbol pattern. Convert the rownames to
-symbols before diagnosing.
-
-Four organisms are supported, differing only in the capitalisation
-convention their symbols follow:
+organism-specific patterns, so `organism` has to match the data. The
+package currently supports mouse, rat, human, and zebrafish.
 
 | code    | organism  | mito   | ribo      |
 |---------|-----------|--------|-----------|
@@ -120,13 +96,9 @@ seurat <- diagnoseQC(seurat, organism = "mmu", doCellCycle = TRUE)
 ```
 
 It is off by default because, unlike the metrics above, scoring assumes
-normalised data – and will run
+normalized data, and will run
 [`Seurat::NormalizeData()`](https://satijalab.org/seurat/reference/NormalizeData.html)
-on the object itself, with a warning, if it arrives raw. For a non-human
-organism it also needs `orthogene` to convert the marker lists. See
-[`?runCellCycle`](https://mikemartinez99.github.io/rscprep/reference/runCellCycle.md)
-for the detail, including the `method` argument for machines without
-network access.
+on the object itself, with a warning, if it arrives raw.
 
 ## Flagging outliers
 
@@ -140,11 +112,11 @@ seurat <- flagQC(seurat, metrics = c(nCount_RNA = "lower", pctMito = "higher"))
 ```
 
 Each entry is `column = bound`, and the bound is per metric because
-which tail matters depends on the metric. `nCount_RNA` wants `"lower"` –
-the low tail is empty droplets and dying cells, while the high tail is
-mostly real, well-captured cells. `pctMito` wants `"higher"`, since high
-is bad and low is not. `"both"` is the default, and is what you want
-when doublets are the concern.
+which outlier tail matters depends on the metric. `nCount_RNA` wants
+`"lower"`: the low tail is empty droplets and dying cells, while the
+high tail is mostly real, well-captured cells. `pctMito` wants
+`"higher"`, since high is bad and low is not. `"both"` is the default,
+and is what you want when doublets are the concern.
 
 A MAD-based threshold adapts to the data, which a hard cutoff cannot: a
 cutoff carried between experiments discards good cells from a shallow
@@ -157,7 +129,7 @@ will call the failure normal and flag the survivors.
 This is the argument that matters most. By default
 [`flagQC()`](https://mikemartinez99.github.io/rscprep/reference/flagQC.md)
 estimates one threshold across every cell in the object. If your samples
-differ in sequencing depth – and they usually do – that single threshold
+differ in sequencing depth (and they usually do), that single threshold
 describes none of them.
 
 Here are three mouse samples at median depths of roughly 2,500, 6,800
@@ -194,7 +166,7 @@ seurat <- flagQC(
 #> • upper: > 1.182-1.858 -- 62 cells
 ```
 
-Three thresholds instead of one – 2,400, 6,512 and 24,910 – and the
+Three thresholds instead of one (2,400, 6,512 and 24,910), and the
 low-count cells in every sample get found. The console prints the
 *range* across groups rather than a line per group, so a twenty-sample
 object stays readable; the per-group numbers are in the table.
@@ -255,7 +227,7 @@ qc[order(-qc$pct_flagged), c("metric", "group", "n_flagged", "pct_flagged")]
 Repeated calls accumulate into this one table, so an object flagged on
 counts globally and then on mitochondrial content per sample yields a
 single table describing both. It is a record written at flag time, not a
-live view – cell counts describe the object as it stood then, which is
+live view. Cell counts describe the object as it stood then, which is
 the point, since being able to say afterwards how many cells were
 dropped and why is the reason to keep it.
 
@@ -281,8 +253,8 @@ groups still get a row in the summary table, with `NA` thresholds and an
 `NA` `column`, so nothing silently disappears.
 
 That `NA`-not-`FALSE` distinction runs throughout. A cell is left `NA`
-when it was never judged – missing metric, missing `group_by` value, or
-a skipped group – so an unjudged cell is never mistaken for one that
+when it was never judged (missing metric, missing `group_by` value, or a
+skipped group), so an unjudged cell is never mistaken for one that
 passed. It matters at the filtering step below.
 
 ## Actually filtering
@@ -339,7 +311,7 @@ seurat <- flagQC(seurat, c(log10GenesPerUMI = "lower"), log = FALSE)
 `nmads` is in the column name, so `nmads = 3` and `nmads = 5` produce
 separate columns and can be compared side by side. `group_by` is **not**
 in the name, so re-running one metric with different grouping overwrites
-the previous flags – the summary table is updated to match, so it never
+the previous flags. The summary table is updated to match, so it never
 describes a column that is no longer there.
 
 `log = TRUE` is the default and is right for count metrics, which are
@@ -365,5 +337,5 @@ write.csv(getOutlierSummary(seurat), "qc/outlier_summary.csv", row.names = FALSE
 Nothing has been removed at this point. The metrics are on the object,
 the flags are on the object, and the record of how the thresholds were
 chosen is on the object. Deciding what to drop is the next step, and it
-is a judgement call – which is why these functions stop short of making
+is a judgement call, which is why these functions stop short of making
 it.

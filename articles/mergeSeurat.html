@@ -73,11 +73,11 @@
 <div class="sourceCode" id="cb1"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://mikemartinez99.github.io/rscprep/">rscprep</a></span><span class="op">)</span></span>
 <span><span class="kw"><a href="https://rdrr.io/r/base/library.html" class="external-link">library</a></span><span class="op">(</span><span class="va"><a href="https://satijalab.org/seurat" class="external-link">Seurat</a></span><span class="op">)</span></span></code></pre></div>
-<p><code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> hands back a named list – one Seurat
+<p><code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> hands back a named list: one Seurat
 object per sample. <code><a href="../reference/mergeSeurat.html">mergeSeurat()</a></code> is the other half of that
-pairing: it collapses the list into a single object you can take through
-a normalisation and integration workflow, without losing track of which
-cell came from which sample.</p>
+pairing: it collapses the list into a single merged object you can take
+through a normalisation and integration workflow, without losing track
+of which cell came from which sample.</p>
 <div class="section level2">
 <h2 id="the-basic-pipeline">The basic pipeline<a class="anchor" aria-label="anchor" href="#the-basic-pipeline"></a>
 </h2>
@@ -96,9 +96,9 @@ reordering in between.</p>
 <div class="section level2">
 <h2 id="what-the-list-names-are-for">What the list names are for<a class="anchor" aria-label="anchor" href="#what-the-list-names-are-for"></a>
 </h2>
-<p>The names of <code>objList</code> are not decoration – they are
-passed to <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> as <code>add.cell.id</code>, so each
-becomes a prefix on that sample’s cell barcodes:</p>
+<p>The names of <code>objList</code> are not decoration. They are passed
+to <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> as <code>add.cell.id</code>, so each becomes a
+prefix on that sample’s cell barcodes:</p>
 <div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">$</span><span class="va">Sample_A</span><span class="op">)</span><span class="op">[</span><span class="fl">1</span><span class="op">:</span><span class="fl">2</span><span class="op">]</span></span>
 <span><span class="co">#&gt; [1] "AAACCCAAGACCTTTG-1" "AAACCCACAGCTATTG-1"</span></span>
@@ -108,7 +108,7 @@ becomes a prefix on that sample’s cell barcodes:</p>
 <p>This matters because 10x barcodes are drawn from a fixed whitelist,
 so the same barcode routinely appears in several samples. Prefixing
 keeps them distinct and keeps every cell traceable back to its origin.
-It is also why names must be present and unique –
+It is also why names must be present and unique.
 <code><a href="../reference/mergeSeurat.html">mergeSeurat()</a></code> refuses to merge a list that is unnamed, has
 blank or <code>NA</code> names, or repeats a name.</p>
 <p>The <code>Ident</code> column set by <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> is
@@ -120,46 +120,68 @@ afterwards:</p>
 <span><span class="co">#&gt;     4821     5104</span></span></code></pre></div>
 </div>
 <div class="section level2">
-<h2 id="what-gets-checked">What gets checked<a class="anchor" aria-label="anchor" href="#what-gets-checked"></a>
+<h2 id="seurat-4-and-seurat-5">Seurat 4 and Seurat 5<a class="anchor" aria-label="anchor" href="#seurat-4-and-seurat-5"></a>
 </h2>
-<p>The list is validated before anything is merged, so a bad batch fails
-with a message naming the offending sample rather than producing a
-subtly wrong object. <code><a href="../reference/mergeSeurat.html">mergeSeurat()</a></code> requires that
-<code>objList</code>:</p>
-<ul>
-<li>is non-empty;</li>
-<li>contains only structurally valid Seurat objects;</li>
-<li>is fully named, with no blank, <code>NA</code> or duplicated
-names;</li>
-<li>contains no zero-cell objects;</li>
-<li>agrees on <code><a href="https://satijalab.github.io/seurat-object/reference/DefaultAssay.html" class="external-link">DefaultAssay()</a></code> across every element.</li>
-</ul>
-<p>The assay check is about <em>agreement</em>, not about
-<code>RNA</code> specifically – a list of <code>ADT</code> objects
-merges fine, a list mixing <code>RNA</code> and <code>ADT</code> does
-not.</p>
-<p>Two more checks run after the merge, to catch a merge that silently
-lost data: every sample must still be present in the merged
-<code>Ident</code> column, and the merged cell count must equal the sum
-of the inputs’.</p>
-</div>
-<div class="section level2">
-<h2 id="two-behaviours-worth-knowing">Two behaviours worth knowing<a class="anchor" aria-label="anchor" href="#two-behaviours-worth-knowing"></a>
-</h2>
-<p>A single-element list short-circuits. The lone object is returned
-as-is, with a message – unmerged, and with its barcodes left
-unprefixed:</p>
+<p><code><a href="../reference/mergeSeurat.html">mergeSeurat()</a></code> works under both versions and detects
+which one is installed. The difference it handles is what
+<code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> returns. Under Seurat 4, every sample’s counts are
+bound into one matrix. Under Seurat 5, each sample keeps its own layer:
+<code>counts.Sample_A</code>, <code>counts.Sample_B</code>, and so
+on.</p>
+<p>By default <code><a href="../reference/mergeSeurat.html">mergeSeurat()</a></code> joins those layers, so the
+merged object has the same shape whichever version made it:</p>
 <div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">one</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span>path <span class="op">=</span> <span class="st">"/path/to/Sample_1/outs"</span>, multi <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">one</span><span class="op">)</span></span>
-<span><span class="co">#&gt; i 'one' has only one object; returning it unmerged.</span></span></code></pre></div>
-<p>And the merged object is returned <strong>invisibly</strong>, after
-being printed. So a bare call shows you the result without flooding the
-console twice, but you still need to assign it to keep it:</p>
+<code class="sourceCode R"><span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span></span>
+<span><span class="va">merged</span></span>
+<span><span class="co">#&gt; An object of class Seurat</span></span>
+<span><span class="co">#&gt; 33538 features across 9925 samples within 1 assay</span></span>
+<span><span class="co">#&gt; Active assay: RNA (33538 features, 0 variable features)</span></span>
+<span><span class="co">#&gt;  1 layer present: counts</span></span></code></pre></div>
+<p>Seurat 5’s own integration workflow, <code><a href="https://satijalab.org/seurat/reference/IntegrateLayers.html" class="external-link">IntegrateLayers()</a></code>,
+needs the layers split by sample. Ask for that with
+<code>joinLayers = FALSE</code>:</p>
 <div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span>      <span class="co"># prints a summary; result is not kept</span></span>
-<span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span>   <span class="co"># assign to keep it</span></span></code></pre></div>
+<code class="sourceCode R"><span><span class="va">merged_split</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">seurat_list</span>, joinLayers <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">merged_split</span></span>
+<span><span class="co">#&gt; An object of class Seurat</span></span>
+<span><span class="co">#&gt; 33538 features across 9925 samples within 1 assay</span></span>
+<span><span class="co">#&gt; Active assay: RNA (33538 features, 0 variable features)</span></span>
+<span><span class="co">#&gt;  2 layers present: counts.Sample_A, counts.Sample_B</span></span></code></pre></div>
+<p>What happens in each case:</p>
+<table class="table">
+<colgroup>
+<col width="50%">
+<col width="50%">
+</colgroup>
+<thead><tr class="header">
+<th>Situation</th>
+<th>Result</th>
+</tr></thead>
+<tbody>
+<tr class="odd">
+<td>Seurat 5, <code>Assay5</code> assays, <code>joinLayers = TRUE</code>
+(default)</td>
+<td>Layers joined into one <code>counts</code> layer</td>
+</tr>
+<tr class="even">
+<td>Seurat 5, <code>joinLayers = FALSE</code>
+</td>
+<td>Layers left split, one per sample</td>
+</tr>
+<tr class="odd">
+<td>Seurat 4</td>
+<td>Nothing to join; <code><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge()</a></code> never splits, and
+<code>joinLayers</code> is ignored</td>
+</tr>
+<tr class="even">
+<td>A list of one object</td>
+<td>Returned unmerged, so there are no layers to join</td>
+</tr>
+</tbody>
+</table>
+<p>Joining is decided assay by assay, from each assay’s class rather
+than from the installed version alone. An object with several assays has
+only its <code>Assay5</code> assays joined.</p>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>
     </nav></aside>
