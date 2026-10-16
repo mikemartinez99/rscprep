@@ -1,0 +1,28 @@
+## The example data
+
+Every example in this vignette runs on data bundled with rscprep: a cut-down
+copy of the 10x Genomics demo run
+[1k Heart Cells from an E18 Mouse (v3 chemistry)](https://www.10xgenomics.com/datasets/1-k-heart-cells-from-an-e-18-mouse-v-3-chemistry-3-standard-3-0-0).
+It is one sample from one `cellranger count` run (Cell Ranger 3.0.0, mm10
+reference), with all 1,011 cells Cell Ranger called.
+
+It comes in two forms, holding the same data:
+
+* **`heart1k`** -- a Seurat object, for examples that start after loading.
+* **A Cell Ranger `outs/` directory** -- for the functions that take a path.
+  It holds `filtered_feature_bc_matrix.h5` (the called cells) and
+  `raw_feature_bc_matrix.h5` (every barcode that had at least 25 UMIs in the
+  original run, empty droplets included):
+
+```{r example-outs}
+outs <- system.file("extdata", "heart_1k_v3", "outs", package = "rscprep")
+```
+
+To keep the package small, only 2,092 of the 31,053 genes are kept: the 2,000
+detected in the most cells, plus every mitochondrial, ribosomal protein and
+cell-cycle gene. Each cell therefore keeps about 70% of its UMIs, and
+percentages such as `pctMito` read higher than they would on the full gene
+set. That is fine for showing how the functions behave and wrong for drawing
+conclusions about heart tissue. `?heart1k` has the details, and
+`data-raw/heart_1k_v3.R` in the package source rebuilds it from the 10x
+download.

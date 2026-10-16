@@ -27,6 +27,7 @@ Imports:
 Suggests:
     dittoSeq,
     DropletUtils,
+    hdf5r,
     knitr,
     Matrix,
     orthogene,
@@ -36,3 +37,6 @@ Suggests:
     withr
 VignetteBuilder: knitr
 Config/testthat/edition: 3
+Depends: 
+    R (>= 3.5)
+LazyData: true

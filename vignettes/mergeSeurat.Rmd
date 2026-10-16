@@ -10,13 +10,11 @@ vignette: >
 ```{r, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment  = "#>",
-  eval     = FALSE  # paths below are illustrative, not real -- flip to TRUE
-                     # once this vignette points at a bundled example dataset
+  comment  = "#>"
 )
 ```
 
-```{r setup}
+```{r setup, message = FALSE}
 library(rscprep)
 library(Seurat)
 ```
@@ -26,14 +24,27 @@ library(Seurat)
 a single object you can take through a normalisation and integration
 workflow, without losing track of which cell came from which sample.
 
+```{r, child = "_heart1k.Rmd"}
+```
+
+```{r, child = "_pseudo-samples.Rmd"}
+```
+
 ## The basic pipeline
 
-```{r pipeline}
+With real data, the list comes straight from `seuratFrom10x()`:
+
+```{r pipeline-real, eval = FALSE}
 seurat_list <- seuratFrom10x(
-  path        = "/path/to/Pool1/outs",
+  path  = "/path/to/Pool1/outs",
   multi = TRUE
 )
+```
 
+Here it is the pseudo-sample list built above, and the merge is the same
+either way:
+
+```{r pipeline}
 merged <- mergeSeurat(seurat_list)
 ```
 
@@ -48,10 +59,8 @@ The names of `objList` are not decoration -- they are passed to `merge()` as
 
 ```{r barcodes}
 colnames(seurat_list$Sample_A)[1:2]
-#> [1] "AAACCCAAGACCTTTG-1" "AAACCCACAGCTATTG-1"
 
 colnames(merged)[1:2]
-#> [1] "Sample_A_AAACCCAAGACCTTTG-1" "Sample_A_AAACCCACAGCTATTG-1"
 ```
 
 This matters because 10x barcodes are drawn from a fixed whitelist, so the
@@ -65,8 +74,6 @@ you can still split or group by sample afterwards:
 
 ```{r idents}
 table(merged$Ident)
-#> Sample_A Sample_B
-#>     4821     5104
 ```
 
 ## What gets checked
@@ -81,6 +88,10 @@ object. `mergeSeurat()` requires that `objList`:
 * contains no zero-cell objects;
 * agrees on `DefaultAssay()` across every element.
 
+```{r duplicated-names, error = TRUE}
+mergeSeurat(setNames(seurat_list, c("Sample_A", "Sample_A", "Sample_C")))
+```
+
 The assay check is about *agreement*, not about `RNA` specifically -- a list
 of `ADT` objects merges fine, a list mixing `RNA` and `ADT` does not.
 
@@ -94,17 +105,17 @@ A single-element list short-circuits. The lone object is returned as-is,
 with a message -- unmerged, and with its barcodes left unprefixed:
 
 ```{r single}
-one <- seuratFrom10x(path = "/path/to/Sample_1/outs", multi = FALSE)
+one <- seuratFrom10x(path = outs, multi = FALSE)
 
-merged <- mergeSeurat(one)
-#> i 'one' has only one object; returning it unmerged.
+merged_one <- mergeSeurat(one)
+colnames(merged_one)[1:2]
 ```
 
 And the merged object is returned **invisibly**, after being printed. So a
 bare call shows you the result without flooding the console twice, but you
 still need to assign it to keep it:
 
-```{r invisible}
-mergeSeurat(seurat_list)      # prints a summary; result is not kept
+```{r invisible, eval = FALSE}
+mergeSeurat(seurat_list)             # prints a summary; result is not kept
 merged <- mergeSeurat(seurat_list)   # assign to keep it
 ```

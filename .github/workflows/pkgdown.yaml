@@ -32,7 +32,14 @@ jobs:
 
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
-          extra-packages: any::pkgdown, local::.
+          # Imports plus only the Suggests the vignettes actually run: hdf5r
+          # to read the bundled H5 files, DropletUtils/S4Vectors for
+          # plotBarcodeRanks(). dittoSeq and orthogene are never loaded by the
+          # site, and installing all Suggests adds ~15 minutes to a cold run.
+          dependencies: '"hard"'
+          extra-packages: >-
+            any::pkgdown, any::knitr, any::rmarkdown, any::hdf5r,
+            any::Matrix, any::DropletUtils, any::S4Vectors, local::.
           needs: website
 
       - name: Build site
