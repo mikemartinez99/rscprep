@@ -77,144 +77,36 @@ per-cell metrics that filtering decisions get made from;
 <code><a href="../reference/flagQC.html">flagQC()</a></code> marks the cells those metrics say are outliers.
 Neither one removes anything – the split is deliberate, so that you can
 look at what a threshold would cut before you cut it.</p>
-<div class="section level2">
-<h2 id="the-example-data">The example data<a class="anchor" aria-label="anchor" href="#the-example-data"></a>
-</h2>
-<p>Every example in this vignette runs on data bundled with rscprep: a
-cut-down copy of the 10x Genomics demo run <a href="https://www.10xgenomics.com/datasets/1-k-heart-cells-from-an-e-18-mouse-v-3-chemistry-3-standard-3-0-0" class="external-link">1k
-Heart Cells from an E18 Mouse (v3 chemistry)</a>. It is one sample from
-one <code>cellranger count</code> run (Cell Ranger 3.0.0, mm10
-reference), with all 1,011 cells Cell Ranger called.</p>
-<p>It comes in two forms, holding the same data:</p>
-<ul>
-<li>
-<strong><code>heart1k</code></strong> – a Seurat object, for
-examples that start after loading.</li>
-<li>
-<strong>A Cell Ranger <code>outs/</code> directory</strong> – for
-the functions that take a path. It holds
-<code>filtered_feature_bc_matrix.h5</code> (the called cells) and
-<code>raw_feature_bc_matrix.h5</code> (every barcode that had at least
-25 UMIs in the original run, empty droplets included):</li>
-</ul>
+<p>This vignette picks up where <a href="mergeSeurat.html"><code>mergeSeurat()</code></a> leaves off:</p>
 <div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">outs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"heart_1k_v3"</span>, <span class="st">"outs"</span>, package <span class="op">=</span> <span class="st">"rscprep"</span><span class="op">)</span></span></code></pre></div>
-<p>To keep the package small, only 2,092 of the 31,053 genes are kept:
-the 2,000 detected in the most cells, plus every mitochondrial,
-ribosomal protein and cell-cycle gene. Each cell therefore keeps about
-70% of its UMIs, and percentages such as <code>pctMito</code> read
-higher than they would on the full gene set. That is fine for showing
-how the functions behave and wrong for drawing conclusions about heart
-tissue. <code><a href="../reference/heart1k.html">?heart1k</a></code> has the details, and
-<code>data-raw/heart_1k_v3.R</code> in the package source rebuilds it
-from the 10x download.</p>
-<div class="section level3">
-<h3 id="making-several-samples-from-one">Making several samples from one<a class="anchor" aria-label="anchor" href="#making-several-samples-from-one"></a>
-</h3>
-<p><code>heart1k</code> is a single sample, and this vignette needs
-several. So the cells are dealt at random into three pseudo-samples, and
-two of them are thinned to look like shallower sequencing runs:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">counts</span> <span class="op">&lt;-</span> <span class="va">heart1k</span><span class="op">[[</span><span class="st">"RNA"</span><span class="op">]</span><span class="op">]</span><span class="op">@</span><span class="va">counts</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
-<span><span class="va">sample_of</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span>, <span class="st">"Sample_C"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">counts</span><span class="op">)</span>,</span>
-<span>                    replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Fraction of each UMI count kept. Keeping each UMI with probability p</span></span>
-<span><span class="co"># ("binomial thinning") is what sequencing a library p times as deeply does.</span></span>
-<span><span class="va">depth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>Sample_A <span class="op">=</span> <span class="fl">0.15</span>, Sample_B <span class="op">=</span> <span class="fl">0.4</span>, Sample_C <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">depth</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">s</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">m</span>    <span class="op">&lt;-</span> <span class="va">counts</span><span class="op">[</span>, <span class="va">sample_of</span> <span class="op">==</span> <span class="va">s</span><span class="op">]</span></span>
-<span>  <span class="va">m</span><span class="op">@</span><span class="va">x</span>  <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">m</span><span class="op">@</span><span class="va">x</span><span class="op">)</span>, <span class="va">m</span><span class="op">@</span><span class="va">x</span>, <span class="va">depth</span><span class="op">[[</span><span class="va">s</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="va">m</span>    <span class="op">&lt;-</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/drop0.html" class="external-link">drop0</a></span><span class="op">(</span><span class="va">m</span><span class="op">)</span></span>
-<span>  <span class="va">obj</span>  <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu"><a href="https://satijalab.github.io/seurat-object/reference/CreateSeuratObject.html" class="external-link">CreateSeuratObject</a></span><span class="op">(</span><span class="va">m</span>, project <span class="op">=</span> <span class="va">s</span>,</span>
-<span>                                     min.cells <span class="op">=</span> <span class="fl">0</span>, min.features <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
-<span>  <span class="va">obj</span><span class="op">$</span><span class="va">Ident</span> <span class="op">&lt;-</span> <span class="va">s</span>     <span class="co"># the sample-name column seuratFrom10x() would set</span></span>
-<span>  <span class="va">obj</span></span>
-<span><span class="op">}</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">depth</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">seurat_list</span></span>
-<span><span class="co">#&gt; $Sample_A</span></span>
-<span><span class="co">#&gt; An object of class Seurat </span></span>
-<span><span class="co">#&gt; 2092 features across 356 samples within 1 assay </span></span>
-<span><span class="co">#&gt; Active assay: RNA (2092 features, 0 variable features)</span></span>
-<span><span class="co">#&gt;  1 layer present: counts</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $Sample_B</span></span>
-<span><span class="co">#&gt; An object of class Seurat </span></span>
-<span><span class="co">#&gt; 2092 features across 341 samples within 1 assay </span></span>
-<span><span class="co">#&gt; Active assay: RNA (2092 features, 0 variable features)</span></span>
-<span><span class="co">#&gt;  1 layer present: counts</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $Sample_C</span></span>
-<span><span class="co">#&gt; An object of class Seurat </span></span>
-<span><span class="co">#&gt; 2092 features across 314 samples within 1 assay </span></span>
-<span><span class="co">#&gt; Active assay: RNA (2092 features, 0 variable features)</span></span>
-<span><span class="co">#&gt;  1 layer present: counts</span></span></code></pre></div>
-<p>That list has the same shape <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> returns for
-a multi-sample run: named by sample, each object carrying its name in
-<code>Ident</code>. The cells are real, but the three “samples” are not
-separate biology. They differ only in simulated depth.</p>
-<p>The three depths matter here: they are what the per-sample section
-below is about.</p>
-</div>
-</div>
-<div class="section level2">
-<h2 id="where-this-starts">Where this starts<a class="anchor" aria-label="anchor" href="#where-this-starts"></a>
-</h2>
-<p>This vignette picks up where <a href="mergeSeurat.html"><code>mergeSeurat()</code></a> leaves off. With
-your own data that is:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span><span class="op">)</span></span>
 <span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sample_sheet</span><span class="op">)</span></span>
 <span><span class="va">seurat</span>      <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span></span></code></pre></div>
-<p>Here it is the pseudo-sample list:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Merging 3 seurat objects...</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Successfully merged 3 seurat objects.</span></span></code></pre></div>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/tapply.html" class="external-link">tapply</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">$</span><span class="va">nCount_RNA</span>, <span class="va">seurat</span><span class="op">$</span><span class="va">Ident</span>, <span class="va">median</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Sample_A Sample_B Sample_C </span></span>
-<span><span class="co">#&gt;      699     2343     5348</span></span></code></pre></div>
 <p>Both functions want that single merged object rather than the list,
 so that one set of thresholds is chosen from one view of the data.</p>
-</div>
 <div class="section level2">
 <h2 id="calculating-the-metrics">Calculating the metrics<a class="anchor" aria-label="anchor" href="#calculating-the-metrics"></a>
 </h2>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/diagnoseQC.html">diagnoseQC</a></span><span class="op">(</span><span class="va">seurat</span>, organism <span class="op">=</span> <span class="st">"mmu"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Diagnosing 1011 cells in assay <span style="color: #0000BB;">"RNA"</span> using <span style="color: #0000BB;">"mmu"</span> gene patterns.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">mito</span>: 13 features matched <span style="color: #0000BB;">"^mt"</span>.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">ribo</span>: 105 features matched <span style="color: #0000BB;">"^Rp[sl]"</span>.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 3 QC metrics to 1011 cells.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> <span style="color: #00BB00;">pctMito</span>: median 9.95%, max 99.48%</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> <span style="color: #00BB00;">pctRibo</span>: median 20.39%, max 56.36%</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> <span style="color: #00BB00;">log10GenesPerUMI</span>: median 0.829</span></span></code></pre></div>
+<span><span class="co">#&gt; ℹ Diagnosing 1200 cells in assay "RNA" using "mmu" gene patterns.</span></span>
+<span><span class="co">#&gt; ℹ mito: 8 features matched "^mt".</span></span>
+<span><span class="co">#&gt; ℹ ribo: 39 features matched "^Rp[sl]".</span></span>
+<span><span class="co">#&gt; ✔ Added 3 QC metrics to 1200 cells.</span></span>
+<span><span class="co">#&gt; • pctMito: median 0.95%, max 19.59%</span></span>
+<span><span class="co">#&gt; • pctRibo: median 4.59%, max 5.91%</span></span>
+<span><span class="co">#&gt; • log10GenesPerUMI: median 0.764</span></span></code></pre></div>
 <p>Three columns land in the metadata, alongside the
 <code>nCount_RNA</code> and <code>nFeature_RNA</code> that Seurat
 already wrote:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/utils/head.html" class="external-link">head</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">@</span><span class="va">meta.data</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"nCount_RNA"</span>, <span class="st">"nFeature_RNA"</span>,</span>
 <span>                          <span class="st">"pctMito"</span>, <span class="st">"pctRibo"</span>, <span class="st">"log10GenesPerUMI"</span><span class="op">)</span><span class="op">]</span><span class="op">)</span></span>
-<span><span class="co">#&gt;                             nCount_RNA nFeature_RNA   pctMito   pctRibo</span></span>
-<span><span class="co">#&gt; Sample_A_AAACCCACACCAGTAT-1       1718          647  7.101281 31.490105</span></span>
-<span><span class="co">#&gt; Sample_A_AAACCCAGTGGAACAC-1       1972          782  9.178499 23.326572</span></span>
-<span><span class="co">#&gt; Sample_A_AAACGAAGTCAGGTGA-1        495           25  0.000000  4.040404</span></span>
-<span><span class="co">#&gt; Sample_A_AACAACCAGGTTTGAA-1       1228          525 11.889251 35.016287</span></span>
-<span><span class="co">#&gt; Sample_A_AACAAGATCGGATACT-1        916          428 36.899563  8.624454</span></span>
-<span><span class="co">#&gt; Sample_A_AACAAGATCGGTAAGG-1       1654          684  8.464329 25.272068</span></span>
-<span><span class="co">#&gt;                             log10GenesPerUMI</span></span>
-<span><span class="co">#&gt; Sample_A_AAACCCACACCAGTAT-1        0.8688977</span></span>
-<span><span class="co">#&gt; Sample_A_AAACCCAGTGGAACAC-1        0.8780845</span></span>
-<span><span class="co">#&gt; Sample_A_AAACGAAGTCAGGTGA-1        0.5187921</span></span>
-<span><span class="co">#&gt; Sample_A_AACAACCAGGTTTGAA-1        0.8805389</span></span>
-<span><span class="co">#&gt; Sample_A_AACAAGATCGGATACT-1        0.8884324</span></span>
-<span><span class="co">#&gt; Sample_A_AACAAGATCGGTAAGG-1        0.8808528</span></span></code></pre></div>
+<span><span class="co">#&gt;                nCount_RNA nFeature_RNA pctMito pctRibo log10GenesPerUMI</span></span>
+<span><span class="co">#&gt; Sample_1_Cell1        443          318  15.124   3.612            0.946</span></span>
+<span><span class="co">#&gt; Sample_1_Cell2        464          326  12.500   3.879            0.943</span></span>
+<span><span class="co">#&gt; Sample_1_Cell3        444          294  19.595   2.703            0.932</span></span>
+<span><span class="co">#&gt; Sample_1_Cell4        454          316  15.639   3.304            0.941</span></span></code></pre></div>
 <ul>
 <li>
 <strong><code>pctMito</code></strong> – share of a cell’s UMIs
@@ -222,9 +114,7 @@ coming from mitochondrial genes. High means the cell lost cytoplasmic
 RNA through a ruptured membrane, so this is the usual first filter. What
 counts as high is tissue-dependent: 5–10% is a common starting point,
 but cardiac, muscle and kidney are legitimately mitochondria-rich and a
-fixed cutoff throws away real cells. This is heart: 50% of its cells are
-above 10%, and 30% above 20%. (The gene subset inflates these somewhat –
-see above.)</li>
+fixed cutoff throws away real cells.</li>
 <li>
 <strong><code>pctRibo</code></strong> – share from ribosomal protein
 genes. Rarely a hard filter, because it varies strongly by cell type.
@@ -245,21 +135,15 @@ match the data.</p>
 </h2>
 <p>Get the organism wrong and both columns come back as zeroes. That is
 loud rather than silent:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">wrong</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/diagnoseQC.html">diagnoseQC</a></span><span class="op">(</span><span class="va">seurat</span>, organism <span class="op">=</span> <span class="st">"hsa"</span><span class="op">)</span>   <span class="co"># mouse data</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Diagnosing 1011 cells in assay <span style="color: #0000BB;">"RNA"</span> using <span style="color: #0000BB;">"hsa"</span> gene patterns.</span></span>
-<span><span class="co">#&gt; Warning: <span style="color: #BBBB00;">!</span> <span style="color: #00BB00;">mito</span> pattern <span style="color: #0000BB;">"^MT-"</span> matched 0 features for organism <span style="color: #0000BB;">"hsa"</span>.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Check that rownames are gene symbols and not Ensembl IDs --</span></span>
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/diagnoseQC.html">diagnoseQC</a></span><span class="op">(</span><span class="va">seurat</span>, organism <span class="op">=</span> <span class="st">"hsa"</span><span class="op">)</span>   <span class="co"># mouse data</span></span>
+<span><span class="co">#&gt; Warning:</span></span>
+<span><span class="co">#&gt; ! mito pattern "^MT-" matched 0 features for organism "hsa".</span></span>
+<span><span class="co">#&gt; ℹ Check that rownames are gene symbols and not Ensembl IDs --</span></span>
 <span><span class="co">#&gt;   `head(rownames(seurat))` will show which.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">pctMito</span> will be 0 for every cell.</span></span>
-<span><span class="co">#&gt; Warning: <span style="color: #BBBB00;">!</span> <span style="color: #00BB00;">ribo</span> pattern <span style="color: #0000BB;">"^RP[SL]"</span> matched 0 features for organism <span style="color: #0000BB;">"hsa"</span>.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Check that rownames are gene symbols and not Ensembl IDs --</span></span>
-<span><span class="co">#&gt;   `head(rownames(seurat))` will show which.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">pctRibo</span> will be 0 for every cell.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 3 QC metrics to 1011 cells.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> <span style="color: #00BB00;">pctMito</span>: median 0%, max 0%</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> <span style="color: #00BB00;">pctRibo</span>: median 0%, max 0%</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> <span style="color: #00BB00;">log10GenesPerUMI</span>: median 0.829</span></span></code></pre></div>
+<span><span class="co">#&gt; ℹ pctMito will be 0 for every cell.</span></span>
+<span><span class="co">#&gt; ✔ Added 3 QC metrics to 1200 cells.</span></span>
+<span><span class="co">#&gt; • pctMito: median 0%, max 0%</span></span></code></pre></div>
 <p>The same warning fires when the organism is right but the matrix is
 still keyed by Ensembl IDs, which is the other common cause –
 <code>ENSMUSG00000064341</code> matches no symbol pattern. Convert the
@@ -308,17 +192,16 @@ shares.</p>
 </h2>
 <p><code>doCellCycle = TRUE</code> also hands the object to
 <code><a href="../reference/runCellCycle.html">runCellCycle()</a></code>, adding <code>S.Score</code>,
-<code>G2M.Score</code> and <code>Phase</code>. It is not run here,
-because for mouse data it converts the human marker lists through
-<code>orthogene</code>, which needs network access:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code>G2M.Score</code> and <code>Phase</code>:</p>
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/diagnoseQC.html">diagnoseQC</a></span><span class="op">(</span><span class="va">seurat</span>, organism <span class="op">=</span> <span class="st">"mmu"</span>, doCellCycle <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p>It is off by default because, unlike the metrics above, scoring
 assumes normalised data – and will run
 <code><a href="https://satijalab.org/seurat/reference/NormalizeData.html" class="external-link">Seurat::NormalizeData()</a></code> on the object itself, with a
-warning, if it arrives raw. See <code><a href="../reference/runCellCycle.html">?runCellCycle</a></code> for the
-detail, including the <code>method</code> argument for machines without
-network access.</p>
+warning, if it arrives raw. For a non-human organism it also needs
+<code>orthogene</code> to convert the marker lists. See
+<code><a href="../reference/runCellCycle.html">?runCellCycle</a></code> for the detail, including the
+<code>method</code> argument for machines without network access.</p>
 </div>
 <div class="section level2">
 <h2 id="flagging-outliers">Flagging outliers<a class="anchor" aria-label="anchor" href="#flagging-outliers"></a>
@@ -326,17 +209,11 @@ network access.</p>
 <p><code><a href="../reference/flagQC.html">flagQC()</a></code> marks cells that sit an unusual distance from
 the rest, using the median absolute deviation rather than a fixed
 cutoff:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">flagged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, metrics <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nFeature_RNA <span class="op">=</span> <span class="st">"lower"</span>, pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Flagging outliers in 2 metrics at 3 MADs from the median (log2 scale), across all cells.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">nFeature_RNA</span>: 14/1011 cells flagged (1.38%).</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> lower: &lt; 10.91 -- 14 cells</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">pctMito</span>: 0/1011 cells flagged (0%).</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> upper: &gt; 167.5 -- 0 cells</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 2 outlier columns; summary in `seurat@misc$flagQC`.</span></span></code></pre></div>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, metrics <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span>, pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 <p>Each entry is <code>column = bound</code>, and the bound is per
 metric because which tail matters depends on the metric.
-<code>nFeature_RNA</code> wants <code>"lower"</code> – the low tail is
+<code>nCount_RNA</code> wants <code>"lower"</code> – the low tail is
 empty droplets and dying cells, while the high tail is mostly real,
 well-captured cells. <code>pctMito</code> wants <code>"higher"</code>,
 since high is bad and low is not. <code>"both"</code> is the default,
@@ -346,26 +223,6 @@ a cutoff carried between experiments discards good cells from a shallow
 run and keeps bad ones from a deep one. The cost is that it assumes most
 of the cells it is estimated from are good. On a badly failed sample it
 will call the failure normal and flag the survivors.</p>
-<div class="section level3">
-<h3 id="when-the-log-scale-is-wrong">When the log scale is wrong<a class="anchor" aria-label="anchor" href="#when-the-log-scale-is-wrong"></a>
-</h3>
-<p>Look at the <code>pctMito</code> line above: an upper cutoff of 167%,
-which no cell can exceed. The MAD is estimated on a log2 scale by
-default. That suits count metrics, which are strongly right-skewed. But
-in this heart, <code>pctMito</code> runs from near 0 to 99%. On a log
-scale the cells near zero stretch the spread so far that 3 MADs above
-the median lands past 100%.</p>
-<p>On the original scale the cutoff is usable:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">flagged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">flagged</span>, metrics <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>, log <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Flagging outliers in 1 metric at 3 MADs from the median, across all cells.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">pctMito</span>: 149/1011 cells flagged (14.74%).</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> upper: &gt; 42.29 -- 149 cells</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 2 outlier columns; summary in `flagged@misc$flagQC`.</span></span></code></pre></div>
-<p>Check the thresholds in the console output before you trust the
-flags. A cutoff outside the range a metric can take is the clearest sign
-the scale is wrong for it.</p>
-</div>
 </div>
 <div class="section level2">
 <h2 id="estimating-thresholds-per-sample">Estimating thresholds per sample<a class="anchor" aria-label="anchor" href="#estimating-thresholds-per-sample"></a>
@@ -374,98 +231,87 @@ the scale is wrong for it.</p>
 <code><a href="../reference/flagQC.html">flagQC()</a></code> estimates one threshold across every cell in the
 object. If your samples differ in sequencing depth – and they usually do
 – that single threshold describes none of them.</p>
-<p>The three pseudo-samples have median depths of roughly 700, 2,340,
-and 5,350 UMIs. Globally:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">global</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nFeature_RNA <span class="op">=</span> <span class="st">"lower"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Flagging outliers in 1 metric at 3 MADs from the median (log2 scale), across all cells.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">nFeature_RNA</span>: 14/1011 cells flagged (1.38%).</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> lower: &lt; 10.91 -- 14 cells</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 1 outlier column; summary in `seurat@misc$flagQC`.</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">global</span><span class="op">$</span><span class="va">Ident</span>, flagged <span class="op">=</span> <span class="va">global</span><span class="op">$</span><span class="va">nFeature_RNA_3_lower_outliers</span><span class="op">)</span></span>
-<span><span class="co">#&gt;           flagged</span></span>
-<span><span class="co">#&gt;            FALSE TRUE</span></span>
-<span><span class="co">#&gt;   Sample_A   343   13</span></span>
-<span><span class="co">#&gt;   Sample_B   340    1</span></span>
-<span><span class="co">#&gt;   Sample_C   314    0</span></span></code></pre></div>
-<p>One cutoff, set mostly by the middle of the pooled data. It sits low
-for the deep sample and high for the shallow one, so its flags land on
-<code>Sample_A</code> because that sample was sequenced shallowly, not
-because its cells are worse. The deep sample’s poorest cells clear it
-easily.</p>
+<p>Here are three mouse samples at median depths of roughly 2,500, 6,800
+and 25,000 UMIs. Globally:</p>
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">global</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span>, pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="co">#&gt; ℹ Flagging outliers in 2 metrics at 3 MADs from the median (log2 scale), across all cells.</span></span>
+<span><span class="co">#&gt; ℹ nCount_RNA: 0/1200 cells flagged (0%).</span></span>
+<span><span class="co">#&gt; • lower: &lt; 87.67 -- 0 cells</span></span>
+<span><span class="co">#&gt; ℹ pctMito: 68/1200 cells flagged (5.67%).</span></span>
+<span><span class="co">#&gt; • upper: &gt; 1.386 -- 68 cells</span></span></code></pre></div>
+<p>The <code>nCount_RNA</code> threshold comes out at <strong>87 UMIs
+and catches nothing</strong>. Pooling three depth tiers inflates the
+spread so far that the cutoff falls below every real cell in the
+experiment, including the dying ones it exists to find.</p>
 <p>Now per sample:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nFeature_RNA <span class="op">=</span> <span class="st">"lower"</span><span class="op">)</span>, group_by <span class="op">=</span> <span class="st">"Ident"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Flagging outliers in 1 metric at 3 MADs from the median (log2 scale), within 3 groups of <span style="color: #00BB00;">Ident</span>.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">nFeature_RNA</span>: 46/1011 cells flagged (4.55%) across 3 groups.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> lower: &lt; 3.781-87.11 -- 46 cells</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 1 outlier column; summary in `seurat@misc$flagQC`.</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">$</span><span class="va">Ident</span>, flagged <span class="op">=</span> <span class="va">seurat</span><span class="op">$</span><span class="va">nFeature_RNA_3_lower_outliers</span><span class="op">)</span></span>
-<span><span class="co">#&gt;           flagged</span></span>
-<span><span class="co">#&gt;            FALSE TRUE</span></span>
-<span><span class="co">#&gt;   Sample_A   353    3</span></span>
-<span><span class="co">#&gt;   Sample_B   333    8</span></span>
-<span><span class="co">#&gt;   Sample_C   279   35</span></span></code></pre></div>
-<p>Three thresholds instead of one, each set against its own sample’s
-distribution. The flags move to the cells that are poor <em>for their
-sample</em>, which in this case means mostly the deep one. The console
-prints the <em>range</em> across groups rather than a line per group, so
-a twenty-sample object stays readable; the per-group numbers are in the
-summary table below.</p>
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span></span>
+<span>  <span class="va">seurat</span>,</span>
+<span>  metrics  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span>, pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>,</span>
+<span>  group_by <span class="op">=</span> <span class="st">"Ident"</span></span>
+<span><span class="op">)</span></span>
+<span><span class="co">#&gt; ℹ Flagging outliers in 2 metrics at 3 MADs from the median (log2 scale), within 3 groups of Ident.</span></span>
+<span><span class="co">#&gt; ℹ nCount_RNA: 64/1200 cells flagged (5.33%) across 3 groups.</span></span>
+<span><span class="co">#&gt; • lower: &lt; 2400-24910 -- 64 cells</span></span>
+<span><span class="co">#&gt; ℹ pctMito: 62/1200 cells flagged (5.17%) across 3 groups.</span></span>
+<span><span class="co">#&gt; • upper: &gt; 1.182-1.858 -- 62 cells</span></span></code></pre></div>
+<p>Three thresholds instead of one – 2,400, 6,512 and 24,910 – and the
+low-count cells in every sample get found. The console prints the
+<em>range</em> across groups rather than a line per group, so a
+twenty-sample object stays readable; the per-group numbers are in the
+table.</p>
 <p><code>"Ident"</code> is the sample name <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code>
 sets, but any discrete metadata column works: a capture batch, a 10x
 lane, a tissue. Group on the technical variable you want the threshold
 to absorb.</p>
-<p><code>pctMito</code> is a ratio, so it does not scale with depth the
-way <code>nFeature_RNA</code> does, and depth is not a reason to group
-it. Flag it across all cells:</p>
-<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>, log <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Flagging outliers in 1 metric at 3 MADs from the median, across all cells.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">pctMito</span>: 149/1011 cells flagged (14.74%).</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> upper: &gt; 42.29 -- 149 cells</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 2 outlier columns; summary in `seurat@misc$flagQC`.</span></span></code></pre></div>
+<p>Note that <code>pctMito</code> barely changed (68 flagged globally,
+62 per sample). It is a ratio, so it does not scale with depth. Grouping
+matters for depth-dependent metrics; for ratio metrics it is close to a
+no-op. That is worth checking rather than assuming.</p>
 </div>
 <div class="section level2">
 <h2 id="reading-the-summary">Reading the summary<a class="anchor" aria-label="anchor" href="#reading-the-summary"></a>
 </h2>
 <p>Every call records what it did. <code><a href="../reference/getOutlierSummary.html">getOutlierSummary()</a></code>
 reads it back:</p>
-<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">qc</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/getOutlierSummary.html">getOutlierSummary</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span></span>
 <span><span class="va">qc</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"metric"</span>, <span class="st">"group"</span>, <span class="st">"lower"</span>, <span class="st">"upper"</span>, <span class="st">"n_flagged"</span>, <span class="st">"pct_flagged"</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="co">#&gt;         metric    group     lower    upper n_flagged pct_flagged</span></span>
-<span><span class="co">#&gt; 1 nFeature_RNA Sample_A  3.780666       NA         3   0.8426966</span></span>
-<span><span class="co">#&gt; 2 nFeature_RNA Sample_B 20.495647       NA         8   2.3460411</span></span>
-<span><span class="co">#&gt; 3 nFeature_RNA Sample_C 87.106975       NA        35  11.1464968</span></span>
-<span><span class="co">#&gt; 4      pctMito     &lt;NA&gt;        NA 42.29134       149  14.7378833</span></span></code></pre></div>
+<span><span class="co">#&gt;       metric    group     lower    upper n_flagged pct_flagged</span></span>
+<span><span class="co">#&gt; 1 nCount_RNA Sample_1  2400.429       NA        22         5.5</span></span>
+<span><span class="co">#&gt; 2 nCount_RNA Sample_2  6512.113       NA        12         3.0</span></span>
+<span><span class="co">#&gt; 3 nCount_RNA Sample_3 24910.163       NA        30         7.5</span></span>
+<span><span class="co">#&gt; 4    pctMito Sample_1        NA 1.857964        20         5.0</span></span>
+<span><span class="co">#&gt; 5    pctMito Sample_2        NA 1.431274        12         3.0</span></span>
+<span><span class="co">#&gt; 6    pctMito Sample_3        NA 1.181886        30         7.5</span></span></code></pre></div>
 <p>One row per metric per group. Two things to notice:</p>
 <ul>
 <li>Thresholds are on the <strong>metric’s own scale</strong>, even
-though the <code>nFeature_RNA</code> estimate was made on a log scale.
-They can be compared against the column directly.</li>
+though the estimate was made on a log scale. They can be compared
+against the column directly.</li>
 <li>The unenforced tail is <code>NA</code>, not an unapplied number.
-<code>nFeature_RNA</code> was flagged <code>"lower"</code> only, so its
+<code>nCount_RNA</code> was flagged <code>"lower"</code> only, so its
 <code>upper</code> is blank rather than a cutoff nothing was tested
 against. The same applies to <code>n_lower</code> /
 <code>n_upper</code>.</li>
 </ul>
-<p>Which group is losing the most cells?</p>
-<div class="sourceCode" id="cb17"><pre class="downlit sourceCode r">
+<p>Which sample is losing the most cells?</p>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">qc</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/order.html" class="external-link">order</a></span><span class="op">(</span><span class="op">-</span><span class="va">qc</span><span class="op">$</span><span class="va">pct_flagged</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"metric"</span>, <span class="st">"group"</span>, <span class="st">"n_flagged"</span>, <span class="st">"pct_flagged"</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="co">#&gt;         metric    group n_flagged pct_flagged</span></span>
-<span><span class="co">#&gt; 4      pctMito     &lt;NA&gt;       149  14.7378833</span></span>
-<span><span class="co">#&gt; 3 nFeature_RNA Sample_C        35  11.1464968</span></span>
-<span><span class="co">#&gt; 2 nFeature_RNA Sample_B         8   2.3460411</span></span>
-<span><span class="co">#&gt; 1 nFeature_RNA Sample_A         3   0.8426966</span></span></code></pre></div>
-<p>The two calls above accumulated into this one table:
-<code>nFeature_RNA</code> per sample, then <code>pctMito</code> across
-all cells. It is a record written at flag time, not a live view – cell
-counts describe the object as it stood then, which is the point, since
-being able to say afterwards how many cells were dropped and why is the
-reason to keep it.</p>
+<span><span class="co">#&gt;       metric    group n_flagged pct_flagged</span></span>
+<span><span class="co">#&gt; 3 nCount_RNA Sample_3        30         7.5</span></span>
+<span><span class="co">#&gt; 6    pctMito Sample_3        30         7.5</span></span>
+<span><span class="co">#&gt; 1 nCount_RNA Sample_1        22         5.5</span></span>
+<span><span class="co">#&gt; 4    pctMito Sample_1        20         5.0</span></span>
+<span><span class="co">#&gt; 2 nCount_RNA Sample_2        12         3.0</span></span>
+<span><span class="co">#&gt; 5    pctMito Sample_2        12         3.0</span></span></code></pre></div>
+<p>Repeated calls accumulate into this one table, so an object flagged
+on counts globally and then on mitochondrial content per sample yields a
+single table describing both. It is a record written at flag time, not a
+live view – cell counts describe the object as it stood then, which is
+the point, since being able to say afterwards how many cells were
+dropped and why is the reason to keep it.</p>
 </div>
 <div class="section level2">
 <h2 id="groups-too-small-to-estimate-from">Groups too small to estimate from<a class="anchor" aria-label="anchor" href="#groups-too-small-to-estimate-from"></a>
@@ -473,21 +319,14 @@ reason to keep it.</p>
 <p>Per-group estimation creates a failure mode global estimation does
 not have. A group of two cells has no usable spread, and a group where
 over half the cells share one value has a MAD of zero. Both are skipped
-rather than given a meaningless threshold. Here, a made-up
-<code>Lane</code> column puts two cells in a lane of their own:</p>
-<div class="sourceCode" id="cb18"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">lanes</span> <span class="op">&lt;-</span> <span class="va">seurat</span></span>
-<span><span class="va">lanes</span><span class="op">$</span><span class="va">Lane</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/ifelse.html" class="external-link">ifelse</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/seq.html" class="external-link">seq_len</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">lanes</span><span class="op">)</span><span class="op">)</span> <span class="op">&lt;=</span> <span class="fl">2</span>, <span class="st">"Lane_3"</span>,</span>
-<span>                     <span class="fu"><a href="https://rdrr.io/r/base/rep.html" class="external-link">rep</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Lane_1"</span>, <span class="st">"Lane_2"</span><span class="op">)</span>, length.out <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">lanes</span><span class="op">)</span><span class="op">)</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">lanes</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">lanes</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span><span class="op">)</span>, group_by <span class="op">=</span> <span class="st">"Lane"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Flagging outliers in 1 metric at 3 MADs from the median (log2 scale), within 3 groups of <span style="color: #00BB00;">Lane</span>.</span></span>
-<span><span class="co">#&gt; Warning: <span style="color: #BBBB00;">!</span> <span style="color: #00BB00;">nCount_RNA</span>: no threshold for 1 of 3 <span style="color: #00BB00;">Lane</span> groups.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Skipped: Lane_3 (fewer than 3 cells)</span></span>
-<span><span class="co">#&gt; <span style="color: #BB0000;">✖</span> Cells in that group are left as <span style="color: #0000BB;">NA</span>, not <span style="color: #0000BB;">FALSE</span>.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> <span style="color: #00BB00;">nCount_RNA</span>: 0/1009 cells flagged (0%) across 2 groups.</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">•</span> lower: &lt; 16.33-18.42 -- 0 cells</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 3 outlier columns; summary in `lanes@misc$flagQC`.</span></span></code></pre></div>
+rather than given a meaningless threshold:</p>
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span><span class="op">)</span>, group_by <span class="op">=</span> <span class="st">"Ident"</span><span class="op">)</span></span>
+<span><span class="co">#&gt; Warning:</span></span>
+<span><span class="co">#&gt; ! nCount_RNA: no threshold for 1 of 3 Ident groups.</span></span>
+<span><span class="co">#&gt; ℹ Skipped: tiny (fewer than 3 cells)</span></span>
+<span><span class="co">#&gt; ✖ Cells in that group are left as NA, not FALSE.</span></span>
+<span><span class="co">#&gt; ℹ nCount_RNA: 0/58 cells flagged (0%) across 2 groups.</span></span></code></pre></div>
 <p>One warning naming every skipped group, not one per group. Skipped
 groups still get a row in the summary table, with <code>NA</code>
 thresholds and an <code>NA</code> <code>column</code>, so nothing
@@ -503,10 +342,10 @@ at the filtering step below.</p>
 </h2>
 <p><code><a href="../reference/flagQC.html">flagQC()</a></code> writes logical columns and stops. Filtering is
 yours:</p>
-<div class="sourceCode" id="cb19"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">flags</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"_outliers$"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">@</span><span class="va">meta.data</span><span class="op">)</span>, value <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
 <span><span class="va">flags</span></span>
-<span><span class="co">#&gt; [1] "nFeature_RNA_3_lower_outliers" "pctMito_3_higher_outliers"</span></span>
+<span><span class="co">#&gt; [1] "nCount_RNA_3_lower_outliers" "pctMito_3_higher_outliers"</span></span>
 <span></span>
 <span><span class="co"># `%in% TRUE` treats an unjudged NA as "not an outlier"; use `isTRUE`-style</span></span>
 <span><span class="co"># logic deliberately rather than letting NA propagate through `|`</span></span>
@@ -516,64 +355,52 @@ yours:</p>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">$</span><span class="va">Ident</span>, <span class="va">keep</span><span class="op">)</span></span>
 <span><span class="co">#&gt;           keep</span></span>
 <span><span class="co">#&gt;            FALSE TRUE</span></span>
-<span><span class="co">#&gt;   Sample_A    58  298</span></span>
-<span><span class="co">#&gt;   Sample_B    59  282</span></span>
-<span><span class="co">#&gt;   Sample_C    74  240</span></span></code></pre></div>
+<span><span class="co">#&gt;   Sample_1    22  378</span></span>
+<span><span class="co">#&gt;   Sample_2    12  388</span></span>
+<span><span class="co">#&gt;   Sample_3    30  370</span></span></code></pre></div>
 <p>Cross-tabulate before you subset. A sample losing far more than its
 neighbours is worth understanding rather than filtering: it may have
 failed, or it may be a genuinely different tissue where the thresholds
 do not transfer.</p>
 <p>You do not have to trust every flag. The columns are independent, so
 filter on the subset you believe:</p>
-<div class="sourceCode" id="cb20"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">filtered</span> <span class="op">&lt;-</span> <span class="va">seurat</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="op">!</span><span class="va">seurat</span><span class="op">$</span><span class="va">pctMito_3_higher_outliers</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">]</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">filtered</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] 862</span></span></code></pre></div>
+<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">filtered</span> <span class="op">&lt;-</span> <span class="va">seurat</span><span class="op">[</span>, <span class="fu"><a href="https://rdrr.io/r/base/which.html" class="external-link">which</a></span><span class="op">(</span><span class="op">!</span><span class="va">seurat</span><span class="op">$</span><span class="va">pctMito_3_higher_outliers</span> <span class="op"><a href="https://rdrr.io/r/base/match.html" class="external-link">%in%</a></span> <span class="cn">TRUE</span><span class="op">)</span><span class="op">]</span></span></code></pre></div>
 </div>
 <div class="section level2">
 <h2 id="tuning">Tuning<a class="anchor" aria-label="anchor" href="#tuning"></a>
 </h2>
-<div class="sourceCode" id="cb21"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb15"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="co"># more aggressive</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>, nmads <span class="op">=</span> <span class="fl">2.5</span>, log <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>, nmads <span class="op">=</span> <span class="fl">2.5</span>, group_by <span class="op">=</span> <span class="st">"Ident"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># keep all but the extremes</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>, nmads <span class="op">=</span> <span class="fl">5</span>, log <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
+<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>, nmads <span class="op">=</span> <span class="fl">5</span>, group_by <span class="op">=</span> <span class="st">"Ident"</span><span class="op">)</span></span>
 <span></span>
 <span><span class="co"># a metric that is already symmetric does not want the log transform</span></span>
 <span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>log10GenesPerUMI <span class="op">=</span> <span class="st">"lower"</span><span class="op">)</span>, log <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>
-<div class="sourceCode" id="cb22"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/colSums.html" class="external-link">colSums</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">@</span><span class="va">meta.data</span><span class="op">[</span><span class="fu"><a href="https://rdrr.io/r/base/grep.html" class="external-link">grep</a></span><span class="op">(</span><span class="st">"^pctMito_"</span>, <span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">colnames</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">@</span><span class="va">meta.data</span><span class="op">)</span><span class="op">)</span><span class="op">]</span>,</span>
-<span>        na.rm <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="co">#&gt;   pctMito_3_higher_outliers pctMito_2.5_higher_outliers </span></span>
-<span><span class="co">#&gt;                         149                         186 </span></span>
-<span><span class="co">#&gt;   pctMito_5_higher_outliers </span></span>
-<span><span class="co">#&gt;                          45</span></span></code></pre></div>
-<p><code>nmads</code> is in the column name, so
-<code>nmads = 2.5</code>, <code>3</code> and <code>5</code> produce
-separate columns and can be compared side by side. <code>group_by</code>
-is <strong>not</strong> in the name, so re-running one metric with
-different grouping overwrites the previous flags – the summary table is
-updated to match, so it never describes a column that is no longer
-there.</p>
+<p><code>nmads</code> is in the column name, so <code>nmads = 3</code>
+and <code>nmads = 5</code> produce separate columns and can be compared
+side by side. <code>group_by</code> is <strong>not</strong> in the name,
+so re-running one metric with different grouping overwrites the previous
+flags – the summary table is updated to match, so it never describes a
+column that is no longer there.</p>
 <p><code>log = TRUE</code> is the default and is right for count
 metrics, which are right-skewed enough that the median and MAD are
 misleading on the raw scale. Turn it off for anything already roughly
-symmetric, and for bounded metrics like <code>pctMito</code> whose low
-end crowds against zero.</p>
+symmetric.</p>
 </div>
 <div class="section level2">
 <h2 id="where-this-leaves-you">Where this leaves you<a class="anchor" aria-label="anchor" href="#where-this-leaves-you"></a>
 </h2>
-<div class="sourceCode" id="cb23"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb16"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span>manifest <span class="op">=</span> <span class="va">manifest</span><span class="op">)</span><span class="op">)</span></span>
 <span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/diagnoseQC.html">diagnoseQC</a></span><span class="op">(</span><span class="va">seurat</span>, organism <span class="op">=</span> <span class="st">"mmu"</span><span class="op">)</span></span>
 <span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span></span>
 <span>  <span class="va">seurat</span>,</span>
-<span>  metrics  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span>, nFeature_RNA <span class="op">=</span> <span class="st">"lower"</span><span class="op">)</span>,</span>
+<span>  metrics  <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>nCount_RNA <span class="op">=</span> <span class="st">"lower"</span>, nFeature_RNA <span class="op">=</span> <span class="st">"lower"</span>, pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>,</span>
 <span>  group_by <span class="op">=</span> <span class="st">"Ident"</span></span>
 <span><span class="op">)</span></span>
-<span><span class="va">seurat</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/flagQC.html">flagQC</a></span><span class="op">(</span><span class="va">seurat</span>, <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>pctMito <span class="op">=</span> <span class="st">"higher"</span><span class="op">)</span>, log <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/getOutlierSummary.html">getOutlierSummary</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span>          <span class="co"># what would be cut, and from where</span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/utils/write.table.html" class="external-link">write.csv</a></span><span class="op">(</span><span class="fu"><a href="../reference/getOutlierSummary.html">getOutlierSummary</a></span><span class="op">(</span><span class="va">seurat</span><span class="op">)</span>, <span class="st">"qc/outlier_summary.csv"</span>, row.names <span class="op">=</span> <span class="cn">FALSE</span><span class="op">)</span></span></code></pre></div>

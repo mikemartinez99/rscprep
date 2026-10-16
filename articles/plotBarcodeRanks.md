@@ -24,60 +24,17 @@ so install it before you start:
 BiocManager::install(c("DropletUtils", "S4Vectors"))
 ```
 
-## The example data
-
-Every example in this vignette runs on data bundled with rscprep: a
-cut-down copy of the 10x Genomics demo run [1k Heart Cells from an E18
-Mouse (v3
-chemistry)](https://www.10xgenomics.com/datasets/1-k-heart-cells-from-an-e-18-mouse-v-3-chemistry-3-standard-3-0-0).
-It is one sample from one `cellranger count` run (Cell Ranger 3.0.0,
-mm10 reference), with all 1,011 cells Cell Ranger called.
-
-It comes in two forms, holding the same data:
-
-- **`heart1k`** – a Seurat object, for examples that start after
-  loading.
-- **A Cell Ranger `outs/` directory** – for the functions that take a
-  path. It holds `filtered_feature_bc_matrix.h5` (the called cells) and
-  `raw_feature_bc_matrix.h5` (every barcode that had at least 25 UMIs in
-  the original run, empty droplets included):
-
-``` r
-
-outs <- system.file("extdata", "heart_1k_v3", "outs", package = "rscprep")
-```
-
-To keep the package small, only 2,092 of the 31,053 genes are kept: the
-2,000 detected in the most cells, plus every mitochondrial, ribosomal
-protein and cell-cycle gene. Each cell therefore keeps about 70% of its
-UMIs, and percentages such as `pctMito` read higher than they would on
-the full gene set. That is fine for showing how the functions behave and
-wrong for drawing conclusions about heart tissue.
-[`?heart1k`](https://mikemartinez99.github.io/rscprep/reference/heart1k.md)
-has the details, and `data-raw/heart_1k_v3.R` in the package source
-rebuilds it from the 10x download.
-
-The bundled raw matrix drops every barcode that had fewer than 25 UMIs
-in the original run. After the gene subset those barcodes total as
-little as 9, so the curves below stop near 10 on the y-axis; a full raw
-matrix runs down to 1.
-
 ## One sample
 
 ``` r
 
 ranks <- plotBarcodeRanks(
-  path  = outs,
+  path  = "/path/to/Sample_1/outs",
   multi = FALSE
 )
-#> ✔ "heart_1k_v3": 20650 raw barcodes, 2092 features.
-#> ℹ "heart_1k_v3": knee at 11711 UMIs, inflection at 725 UMIs; 942 barcodes above the inflection (19708 below).
-#> ✔ Ranked 1 run of 1.
 
-ranks$heart_1k_v3$plot
+ranks$Sample_1$plot
 ```
-
-![](plotBarcodeRanks_files/figure-html/one-sample-1.png)
 
 `path` is the same `outs/` directory you would hand
 [`seuratFrom10x()`](https://mikemartinez99.github.io/rscprep/reference/seuratFrom10x.md),
@@ -97,7 +54,7 @@ therefore reads the **raw** matrix:
 |----|----|----|
 | Reads | `outs/filtered_feature_bc_matrix.h5` | `outs/raw_feature_bc_matrix.h5` |
 | Contains | barcodes called as cells | every barcode in the GEM well |
-| Order | 10^3 to 10^4 columns | 10^5 to 10^6 columns (20,650 in the bundled copy) |
+| Order | 10^3 to 10^4 columns | 10^5 to 10^6 columns |
 
 Nothing is filtered by this function. The knee and the inflection are
 drawn so you can compare them against what Cell Ranger actually kept;
@@ -146,8 +103,7 @@ rows above the same way.
 
 Same manifest
 [`seuratFrom10x()`](https://mikemartinez99.github.io/rscprep/reference/seuratFrom10x.md)
-takes, so one table drives both halves of the workflow. The bundled data
-is one sample, so this example uses placeholder paths and is not run:
+takes, so one table drives both halves of the workflow:
 
 ``` r
 
@@ -179,30 +135,16 @@ One element per sample, each a list:
 
 ``` r
 
-heart <- ranks$heart_1k_v3
+sample_1 <- ranks$Sample_1
 
-head(heart$data)            # the plotted curve
-#>              barcode rank total fitted
-#> 1 ACTGTGACAGGGTTGA-1    1 82062     NA
-#> 2 GGGACAAAGGGACTGT-1    2 69709     NA
-#> 3 GCTTTCGAGGTCATCT-1    3 63381     NA
-#> 4 GTTGCGGAGGTTGACG-1    4 60330     NA
-#> 5 GATCACAAGGCTCACC-1    5 59737     NA
-#> 6 CTCAAGAAGCGACTGA-1    6 52390     NA
-heart$knee                  # optimistic cutoff, in UMIs
-#> [1] 11710.79
-heart$inflection            # permissive cutoff, in UMIs
-#> [1] 724.8193
-heart$n_barcodes            # barcodes in the raw matrix
-#> [1] 20650
-heart$n_above_inflection    # roughly, the cells you would expect
-#> [1] 942
-basename(heart$h5)          # the file this was computed from
-#> [1] "raw_feature_bc_matrix.h5"
+sample_1$plot                 # a ggplot2 object; nothing was printed or saved
+head(sample_1$data)           # the plotted curve
+sample_1$knee                 # optimistic cutoff, in UMIs
+sample_1$inflection           # permissive cutoff, in UMIs
+sample_1$n_barcodes           # barcodes in the raw matrix
+sample_1$n_above_inflection   # roughly, the cells you would expect
+sample_1$h5                   # the file this was computed from
 ```
-
-`heart$plot` is the ggplot2 object drawn above. Nothing was printed or
-saved until it was asked for.
 
 `data` is the curve, not the raw matrix: zero-count barcodes are dropped
 (they have no place on a log axis, and in a raw matrix they are the
@@ -219,42 +161,30 @@ the filtered matrix actually kept is the whole point of drawing these:
 
 ``` r
 
-# min.cells / min.features off, so `called` is what Cell Ranger kept
-seurat_list <- seuratFrom10x(path = outs, multi = FALSE,
-                             min.cells = 0, min.features = 0)
-#> ✔ "heart_1k_v3": 1011 cells, 2092 features.
-#> ✔ Loaded 1 sample.
+seurat_list <- seuratFrom10x(manifest = manifest)
 
 data.frame(
   expected = vapply(ranks, function(x) x$n_above_inflection, numeric(1)),
-  called   = vapply(seurat_list, ncol, numeric(1))
+  called   = vapply(seurat_list, ncol, integer(1))
 )
-#>             expected called
-#> heart_1k_v3      942   1011
+#>          expected called
+#> Sample_1     4914   4821
+#> Sample_2     5230   5104
+#> Sample_3    11702   6633
 ```
 
-The two agree closely, which is what a clean run looks like: the curve
-has a sharp cliff, and Cell Ranger’s cell caller and the inflection
-point found nearly the same edge. A sample where they disagree badly is
-the signal to go look at its curve. A shallow slope with no clear cliff
-usually means ambient RNA, low viability, or a wetting failure, and the
-called cell count from that sample should be treated with suspicion
-regardless of which side of the discrepancy you believe.
+The first two agree closely, which is what a clean run looks like.
+`Sample_3` does not, and that is the signal: go look at its curve. A
+shallow slope with no clear cliff usually means ambient RNA, low
+viability, or a wetting failure, and the called cell count from that
+sample should be treated with suspicion regardless of which side of the
+discrepancy you believe.
 
 ## Writing figures out
 
 ``` r
 
-outdir <- file.path(tempdir(), "barcode_ranks")
-ranks  <- plotBarcodeRanks(path = outs, multi = FALSE, outdir = outdir)
-#> ℹ Created /tmp/Rtmp2myAKd/barcode_ranks.
-#> ✔ "heart_1k_v3": 20650 raw barcodes, 2092 features.
-#> ℹ "heart_1k_v3": knee at 11711 UMIs, inflection at 725 UMIs; 942 barcodes above the inflection (19708 below).
-#> ✔ "heart_1k_v3": wrote /tmp/Rtmp2myAKd/barcode_ranks/heart_1k_v3_barcode_ranks.csv and /tmp/Rtmp2myAKd/barcode_ranks/heart_1k_v3_barcode_ranks.png.
-#> ✔ Ranked 1 run of 1.
-
-list.files(outdir)
-#> [1] "heart_1k_v3_barcode_ranks.csv" "heart_1k_v3_barcode_ranks.png"
+ranks <- plotBarcodeRanks(manifest = manifest, outdir = "qc/barcode_ranks")
 ```
 
 Writes `<sample>_barcode_ranks.csv` and `<sample>_barcode_ranks.png` per
@@ -268,19 +198,13 @@ through to
 ## Tuning the fit
 
 `lower` is the total UMI count at or below which a barcode is assumed
-empty. Only barcodes above it are searched for the knee and inflection;
-it does **not** filter the curve, and barcodes below it are still
-plotted.
+empty. It sets the ambient profile and bounds the spline fit; it does
+**not** filter the curve, and barcodes below it are still plotted.
 
 ``` r
 
-plotBarcodeRanks(path = outs, multi = FALSE, lower = 500)$heart_1k_v3$plot
-#> ✔ "heart_1k_v3": 20650 raw barcodes, 2092 features.
-#> ℹ "heart_1k_v3": knee at 11711 UMIs, inflection at 1533 UMIs; 812 barcodes above the inflection (19838 below).
-#> ✔ Ranked 1 run of 1.
+plotBarcodeRanks(manifest = manifest, lower = 500)$Sample_1$plot
 ```
-
-![](plotBarcodeRanks_files/figure-html/lower-1.png)
 
 Anything else goes to
 [`DropletUtils::barcodeRanks()`](https://rdrr.io/pkg/DropletUtils/man/barcodeRanks.html):
@@ -288,34 +212,17 @@ Anything else goes to
 ``` r
 
 plotBarcodeRanks(
-  path         = outs,
-  multi        = FALSE,
+  manifest     = manifest,
   lower        = 100,
-  exclude.from = 50
+  fit.bounds   = NULL,
+  exclude.from = 50,
+  df           = 20
 )
-#> ✔ "heart_1k_v3": 20650 raw barcodes, 2092 features.
-#> ℹ "heart_1k_v3": knee at 11711 UMIs, inflection at 725 UMIs; 942 barcodes above the inflection (19708 below).
-#> ✔ Ranked 1 run of 1.
 ```
 
-![](plotBarcodeRanks_files/figure-html/dots-1.png)
-
-`exclude.from` drops the highest-ranked barcodes from the search, which
-helps when a handful of enormous barcodes drag the knee upward.
-
-Which other arguments do anything depends on your DropletUtils version,
-because `barcodeRanks()` changed how it finds the knee:
-
-| DropletUtils | How the knee is found | Arguments that tune it | Fitted line on the plot |
-|----|----|----|----|
-| before 1.28 | smoothing spline, then its derivatives | `fit.bounds`, `df` | yes |
-| 1.28 | spline; knee farthest from the plateau-to-inflection line | `fit.bounds`, `df` | yes |
-| 1.30 and later | curve tracing, no spline | `window`, `gradient.threshold` | no – `data$fitted` is `NA` |
-
-[`plotBarcodeRanks()`](https://mikemartinez99.github.io/rscprep/reference/plotBarcodeRanks.md)
-adapts to whichever is installed. But the same data can give a different
-knee, and sometimes a different inflection, under different versions, so
-record `packageVersion("DropletUtils")` alongside any cutoff you report.
+Raise `df` for a stiffer spline if the fitted line is chasing noise in
+the tail; `exclude.from` drops the highest-ranked barcodes from the fit,
+which helps when a handful of enormous barcodes drag the knee upward.
 
 ## Changing the figure
 
@@ -325,16 +232,13 @@ The plots are plain ggplots, so nothing is locked in:
 
 library(ggplot2)
 
-ranks$heart_1k_v3$plot +
-  labs(subtitle = "E18 mouse heart, 10x demo run") +
+ranks$Sample_1$plot +
+  labs(subtitle = "Re-sequenced 2026-08-14") +
   theme_prepro("clean")
 ```
 
-![](plotBarcodeRanks_files/figure-html/customise-1.png)
-
 And `data` is a plain data frame, so a single figure across every sample
-is one `rbind` away. With several samples in `ranks` (one here, so this
-is not run):
+is one `rbind` away:
 
 ``` r
 
@@ -367,18 +271,9 @@ manifest:
 
 ``` r
 
-# the bundled sample, plus a run whose outs/ was never copied over
-manifest <- data.frame(
-  Path  = c(outs, file.path(tempdir(), "Sample_2", "outs")),
-  multi = FALSE
-)
-
 ranks <- plotBarcodeRanks(manifest = manifest)
-#> ✔ "heart_1k_v3": 20650 raw barcodes, 2092 features.
-#> ℹ "heart_1k_v3": knee at 11711 UMIs, inflection at 725 UMIs; 942 barcodes above the inflection (19708 below).
-#> Warning: Raw matrix for "Sample_2" not found at
-#> /tmp/Rtmp2myAKd/Sample_2/outs/raw_feature_bc_matrix.h5
-#> ✔ Ranked 1 run of 2.
+#> ! Raw matrix for "Sample_2" not found at '/path/to/Sample_2/outs/raw_feature_bc_matrix.h5'
+#> v Ranked 2 runs of 3.
 
 setdiff(basename(dirname(manifest$Path)), names(ranks))
 #> [1] "Sample_2"
@@ -404,19 +299,13 @@ memory:
 
 ``` r
 
-raw <- rawMatrixFrom10x(path = outs, multi = FALSE)
-#> ✔ "heart_1k_v3": 20650 raw barcodes, 2092 features.
-#> ✔ Loaded 1 raw matrix from 1 run.
+raw <- rawMatrixFrom10x(path = "/path/to/Sample_1/outs", multi = FALSE)
 
-dim(raw$heart_1k_v3)
-#> [1]  2092 20650
+dim(raw$Sample_1)
+#> [1]   36601 6794880
 
-range(Matrix::colSums(raw$heart_1k_v3))
-#> [1]     9 82062
+range(Matrix::colSums(raw$Sample_1))
 ```
-
-The original raw matrix had 6,794,880 barcodes. The bundled copy keeps
-the 20,650 that had at least 25 UMIs before the gene subset.
 
 It returns count matrices rather than Seurat objects on purpose.
 Wrapping a raw matrix in a Seurat object means computing per-cell

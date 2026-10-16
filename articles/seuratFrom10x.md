@@ -22,85 +22,24 @@ which *pipeline* wrote the directory – not whether samples were pooled.
 See “Choosing `multi`” below if the run came off `cellranger multi` with
 a single sample in it, which is the usual shape for Flex and 5’.
 
-## The example data
-
-Every example in this vignette runs on data bundled with rscprep: a
-cut-down copy of the 10x Genomics demo run [1k Heart Cells from an E18
-Mouse (v3
-chemistry)](https://www.10xgenomics.com/datasets/1-k-heart-cells-from-an-e-18-mouse-v-3-chemistry-3-standard-3-0-0).
-It is one sample from one `cellranger count` run (Cell Ranger 3.0.0,
-mm10 reference), with all 1,011 cells Cell Ranger called.
-
-It comes in two forms, holding the same data:
-
-- **`heart1k`** – a Seurat object, for examples that start after
-  loading.
-- **A Cell Ranger `outs/` directory** – for the functions that take a
-  path. It holds `filtered_feature_bc_matrix.h5` (the called cells) and
-  `raw_feature_bc_matrix.h5` (every barcode that had at least 25 UMIs in
-  the original run, empty droplets included):
-
-``` r
-
-outs <- system.file("extdata", "heart_1k_v3", "outs", package = "rscprep")
-```
-
-To keep the package small, only 2,092 of the 31,053 genes are kept: the
-2,000 detected in the most cells, plus every mitochondrial, ribosomal
-protein and cell-cycle gene. Each cell therefore keeps about 70% of its
-UMIs, and percentages such as `pctMito` read higher than they would on
-the full gene set. That is fine for showing how the functions behave and
-wrong for drawing conclusions about heart tissue.
-[`?heart1k`](https://mikemartinez99.github.io/rscprep/reference/heart1k.md)
-has the details, and `data-raw/heart_1k_v3.R` in the package source
-rebuilds it from the 10x download.
-
 ## A `cellranger count` run
 
 ``` r
 
 seurat_list <- seuratFrom10x(
-  path  = outs,
+  path  = "/path/to/Sample_1/outs",
   multi = FALSE
 )
-#> ✔ "heart_1k_v3": 957 cells, 2089 features.
-#> ✔ Loaded 1 sample.
 
-seurat_list$heart_1k_v3
-#> An object of class Seurat 
-#> 2089 features across 957 samples within 1 assay 
-#> Active assay: RNA (2089 features, 0 variable features)
-#>  1 layer present: counts
+seurat_list$Sample_1
 ```
 
 `path` should point to the Cell Ranger `outs/` directory – the function
 looks for `filtered_feature_bc_matrix.h5` directly inside it. The sample
-name is inferred from the parent folder (`heart_1k_v3`, one level up
-from `outs`).
-
-That object has 957 cells, not the 1,011 in `heart1k`. The defaults
-`min.cells = 10` and `min.features = 50` are passed to
-[`Seurat::CreateSeuratObject()`](https://satijalab.github.io/seurat-object/reference/CreateSeuratObject.html),
-and with only ~2,000 genes in the bundled matrix, 54 cells fall under 50
-detected genes. `heart1k` was built with both set to 0 so it keeps every
-cell Cell Ranger called:
-
-``` r
-
-seuratFrom10x(path = outs, multi = FALSE, min.cells = 0, min.features = 0)
-#> ✔ "heart_1k_v3": 1011 cells, 2092 features.
-#> ✔ Loaded 1 sample.
-#> $heart_1k_v3
-#> An object of class Seurat 
-#> 2092 features across 1011 samples within 1 assay 
-#> Active assay: RNA (2092 features, 0 variable features)
-#>  1 layer present: counts
-```
+name is inferred from the parent folder (`Sample_1`, one level up from
+`outs`).
 
 ## A `cellranger multi` run
-
-The bundled data comes from `cellranger count`, so the next two examples
-use placeholder paths and are not run.
 
 ``` r
 
@@ -170,4 +109,7 @@ works and warns.
 `min.cells` and `min.features` are passed straight through to
 [`Seurat::CreateSeuratObject()`](https://satijalab.github.io/seurat-object/reference/CreateSeuratObject.html)
 and apply uniformly across every sample in a batch – set them once at
-the level of granularity you actually want, not per-sample.
+the level of granularity you actually want, not per-sample. The function
+forces classic (v4-style) Seurat assay objects internally regardless of
+which Seurat package version is installed, so results are consistent
+even in mixed-Seurat-version environments.

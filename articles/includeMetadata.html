@@ -78,91 +78,6 @@ to compare – have to get attached to the objects somewhere.
 <code><a href="../reference/includeMetadata.html">includeMetadata()</a></code> does that from a sample-level table,
 keyed on the names of the list <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> returns.</p>
 <div class="section level2">
-<h2 id="the-example-data">The example data<a class="anchor" aria-label="anchor" href="#the-example-data"></a>
-</h2>
-<p>Every example in this vignette runs on data bundled with rscprep: a
-cut-down copy of the 10x Genomics demo run <a href="https://www.10xgenomics.com/datasets/1-k-heart-cells-from-an-e-18-mouse-v-3-chemistry-3-standard-3-0-0" class="external-link">1k
-Heart Cells from an E18 Mouse (v3 chemistry)</a>. It is one sample from
-one <code>cellranger count</code> run (Cell Ranger 3.0.0, mm10
-reference), with all 1,011 cells Cell Ranger called.</p>
-<p>It comes in two forms, holding the same data:</p>
-<ul>
-<li>
-<strong><code>heart1k</code></strong> – a Seurat object, for
-examples that start after loading.</li>
-<li>
-<strong>A Cell Ranger <code>outs/</code> directory</strong> – for
-the functions that take a path. It holds
-<code>filtered_feature_bc_matrix.h5</code> (the called cells) and
-<code>raw_feature_bc_matrix.h5</code> (every barcode that had at least
-25 UMIs in the original run, empty droplets included):</li>
-</ul>
-<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">outs</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/system.file.html" class="external-link">system.file</a></span><span class="op">(</span><span class="st">"extdata"</span>, <span class="st">"heart_1k_v3"</span>, <span class="st">"outs"</span>, package <span class="op">=</span> <span class="st">"rscprep"</span><span class="op">)</span></span></code></pre></div>
-<p>To keep the package small, only 2,092 of the 31,053 genes are kept:
-the 2,000 detected in the most cells, plus every mitochondrial,
-ribosomal protein and cell-cycle gene. Each cell therefore keeps about
-70% of its UMIs, and percentages such as <code>pctMito</code> read
-higher than they would on the full gene set. That is fine for showing
-how the functions behave and wrong for drawing conclusions about heart
-tissue. <code><a href="../reference/heart1k.html">?heart1k</a></code> has the details, and
-<code>data-raw/heart_1k_v3.R</code> in the package source rebuilds it
-from the 10x download.</p>
-<div class="section level3">
-<h3 id="making-several-samples-from-one">Making several samples from one<a class="anchor" aria-label="anchor" href="#making-several-samples-from-one"></a>
-</h3>
-<p><code>heart1k</code> is a single sample, and this vignette needs
-several. So the cells are dealt at random into three pseudo-samples, and
-two of them are thinned to look like shallower sequencing runs:</p>
-<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">counts</span> <span class="op">&lt;-</span> <span class="va">heart1k</span><span class="op">[[</span><span class="st">"RNA"</span><span class="op">]</span><span class="op">]</span><span class="op">@</span><span class="va">counts</span></span>
-<span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/Random.html" class="external-link">set.seed</a></span><span class="op">(</span><span class="fl">1</span><span class="op">)</span></span>
-<span><span class="va">sample_of</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/sample.html" class="external-link">sample</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span>, <span class="st">"Sample_C"</span><span class="op">)</span>, <span class="fu"><a href="https://rdrr.io/r/base/nrow.html" class="external-link">ncol</a></span><span class="op">(</span><span class="va">counts</span><span class="op">)</span>,</span>
-<span>                    replace <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span></span>
-<span><span class="co"># Fraction of each UMI count kept. Keeping each UMI with probability p</span></span>
-<span><span class="co"># ("binomial thinning") is what sequencing a library p times as deeply does.</span></span>
-<span><span class="va">depth</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span>Sample_A <span class="op">=</span> <span class="fl">0.15</span>, Sample_B <span class="op">=</span> <span class="fl">0.4</span>, Sample_C <span class="op">=</span> <span class="fl">1</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/lapply.html" class="external-link">lapply</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">depth</span><span class="op">)</span>, <span class="kw">function</span><span class="op">(</span><span class="va">s</span><span class="op">)</span> <span class="op">{</span></span>
-<span>  <span class="va">m</span>    <span class="op">&lt;-</span> <span class="va">counts</span><span class="op">[</span>, <span class="va">sample_of</span> <span class="op">==</span> <span class="va">s</span><span class="op">]</span></span>
-<span>  <span class="va">m</span><span class="op">@</span><span class="va">x</span>  <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/numeric.html" class="external-link">as.numeric</a></span><span class="op">(</span><span class="fu">stats</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/stats/Binomial.html" class="external-link">rbinom</a></span><span class="op">(</span><span class="fu"><a href="https://rdrr.io/r/base/length.html" class="external-link">length</a></span><span class="op">(</span><span class="va">m</span><span class="op">@</span><span class="va">x</span><span class="op">)</span>, <span class="va">m</span><span class="op">@</span><span class="va">x</span>, <span class="va">depth</span><span class="op">[[</span><span class="va">s</span><span class="op">]</span><span class="op">]</span><span class="op">)</span><span class="op">)</span></span>
-<span>  <span class="va">m</span>    <span class="op">&lt;-</span> <span class="fu">Matrix</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/pkg/Matrix/man/drop0.html" class="external-link">drop0</a></span><span class="op">(</span><span class="va">m</span><span class="op">)</span></span>
-<span>  <span class="va">obj</span>  <span class="op">&lt;-</span> <span class="fu">Seurat</span><span class="fu">::</span><span class="fu"><a href="https://satijalab.github.io/seurat-object/reference/CreateSeuratObject.html" class="external-link">CreateSeuratObject</a></span><span class="op">(</span><span class="va">m</span>, project <span class="op">=</span> <span class="va">s</span>,</span>
-<span>                                     min.cells <span class="op">=</span> <span class="fl">0</span>, min.features <span class="op">=</span> <span class="fl">0</span><span class="op">)</span></span>
-<span>  <span class="va">obj</span><span class="op">$</span><span class="va">Ident</span> <span class="op">&lt;-</span> <span class="va">s</span>     <span class="co"># the sample-name column seuratFrom10x() would set</span></span>
-<span>  <span class="va">obj</span></span>
-<span><span class="op">}</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">depth</span><span class="op">)</span></span>
-<span></span>
-<span><span class="va">seurat_list</span></span>
-<span><span class="co">#&gt; $Sample_A</span></span>
-<span><span class="co">#&gt; An object of class Seurat </span></span>
-<span><span class="co">#&gt; 2092 features across 356 samples within 1 assay </span></span>
-<span><span class="co">#&gt; Active assay: RNA (2092 features, 0 variable features)</span></span>
-<span><span class="co">#&gt;  1 layer present: counts</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $Sample_B</span></span>
-<span><span class="co">#&gt; An object of class Seurat </span></span>
-<span><span class="co">#&gt; 2092 features across 341 samples within 1 assay </span></span>
-<span><span class="co">#&gt; Active assay: RNA (2092 features, 0 variable features)</span></span>
-<span><span class="co">#&gt;  1 layer present: counts</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; $Sample_C</span></span>
-<span><span class="co">#&gt; An object of class Seurat </span></span>
-<span><span class="co">#&gt; 2092 features across 314 samples within 1 assay </span></span>
-<span><span class="co">#&gt; Active assay: RNA (2092 features, 0 variable features)</span></span>
-<span><span class="co">#&gt;  1 layer present: counts</span></span></code></pre></div>
-<p>That list has the same shape <code><a href="../reference/seuratFrom10x.html">seuratFrom10x()</a></code> returns for
-a multi-sample run: named by sample, each object carrying its name in
-<code>Ident</code>. The cells are real, but the three “samples” are not
-separate biology. They differ only in simulated depth.</p>
-<p>The treatment labels below are invented for the example. All three
-pseudo-samples are the same heart.</p>
-</div>
-</div>
-<div class="section level2">
 <h2 id="why-not-just-put-it-in-the-manifest">Why not just put it in the manifest?<a class="anchor" aria-label="anchor" href="#why-not-just-put-it-in-the-manifest"></a>
 </h2>
 <p>Because the manifest is a different kind of table. Its rows are Cell
@@ -170,7 +85,7 @@ Ranger <strong>runs</strong> – one per <code>outs/</code> directory.
 Treatment is a property of a <strong>sample</strong>. For a plain
 <code>cellranger count</code> run those happen to coincide, so it is
 tempting to add a <code>Treatment</code> column and be done:</p>
-<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb2"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">manifest</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  Path        <span class="op">=</span> <span class="st">"/path/to/Sample_1/outs"</span>,</span>
 <span>  multi <span class="op">=</span> <span class="cn">FALSE</span>,</span>
@@ -199,44 +114,36 @@ and it is the same code path either way.</p>
 <div class="section level2">
 <h2 id="the-workflow">The workflow<a class="anchor" aria-label="anchor" href="#the-workflow"></a>
 </h2>
-<p>Start from the list and read its names:</p>
-<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span></span>
-<span><span class="co">#&gt; [1] "Sample_A" "Sample_B" "Sample_C"</span></span></code></pre></div>
-<p>For a <code>cellranger multi</code> run those are the folder names
-under <code>per_sample_outs/</code>. Those names are what you key on.
-Write a sheet against them:</p>
-<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb3"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">seurat_list</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/seuratFrom10x.html">seuratFrom10x</a></span><span class="op">(</span></span>
+<span>  path        <span class="op">=</span> <span class="st">"/path/to/Pool1/outs"</span>,</span>
+<span>  multi <span class="op">=</span> <span class="cn">TRUE</span></span>
+<span><span class="op">)</span></span>
+<span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/names.html" class="external-link">names</a></span><span class="op">(</span><span class="va">seurat_list</span><span class="op">)</span></span>
+<span><span class="co">#&gt; [1] "Bleo_18_Slim_10" "Bleo_22_Slim_14" "Ctrl_04_Slim_02" "Ctrl_09_Slim_07"</span></span></code></pre></div>
+<p>Those names are what you key on. Write a sheet against them:</p>
+<div class="sourceCode" id="cb4"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sheet</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  Sample    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span>, <span class="st">"Sample_C"</span><span class="op">)</span>,</span>
-<span>  Treatment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Bleomycin"</span>, <span class="st">"Bleomycin"</span><span class="op">)</span>,</span>
-<span>  Timepoint <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"D21"</span>, <span class="st">"D21"</span>, <span class="st">"D21"</span><span class="op">)</span></span>
+<span>  Sample    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Bleo_18_Slim_10"</span>, <span class="st">"Bleo_22_Slim_14"</span>,</span>
+<span>                <span class="st">"Ctrl_04_Slim_02"</span>, <span class="st">"Ctrl_09_Slim_07"</span><span class="op">)</span>,</span>
+<span>  Treatment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Bleomycin"</span>, <span class="st">"Bleomycin"</span>, <span class="st">"Control"</span>, <span class="st">"Control"</span><span class="op">)</span>,</span>
+<span>  Timepoint <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"D21"</span>, <span class="st">"D21"</span>, <span class="st">"D21"</span>, <span class="st">"D21"</span><span class="op">)</span></span>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sheet</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 2 metadata columns to 3 objects: <span style="color: #0000BB;">"Treatment"</span> and <span style="color: #0000BB;">"Timepoint"</span></span></span></code></pre></div>
+<span><span class="co">#&gt; ✔ Added 2 metadata columns to 4 objects: "Treatment" and "Timepoint"</span></span></code></pre></div>
 <p>In practice the sheet lives in a CSV next to your analysis, filled in
 by whoever ran the experiment and kept under version control:</p>
-<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb5"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sheet</span>     <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/utils/read.table.html" class="external-link">read.csv</a></span><span class="op">(</span><span class="st">"samplesheet.csv"</span><span class="op">)</span></span>
 <span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sheet</span><span class="op">)</span></span></code></pre></div>
 <p>Each column is broadcast across every cell of its sample, so after
 merging you can group by it directly:</p>
-<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb6"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">annotated</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Merging 3 seurat objects...</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Successfully merged 3 seurat objects.</span></span>
-<span><span class="co">#&gt; An object of class Seurat </span></span>
-<span><span class="co">#&gt; 2092 features across 1011 samples within 1 assay </span></span>
-<span><span class="co">#&gt; Active assay: RNA (2092 features, 0 variable features)</span></span>
-<span><span class="co">#&gt;  1 layer present: counts</span></span>
 <span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">merged</span><span class="op">$</span><span class="va">Ident</span>, <span class="va">merged</span><span class="op">$</span><span class="va">Treatment</span><span class="op">)</span></span>
-<span><span class="co">#&gt;           </span></span>
-<span><span class="co">#&gt;            Bleomycin Control</span></span>
-<span><span class="co">#&gt;   Sample_A         0     356</span></span>
-<span><span class="co">#&gt;   Sample_B       341       0</span></span>
-<span><span class="co">#&gt;   Sample_C       314       0</span></span></code></pre></div>
+<span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">merged</span><span class="op">$</span><span class="va">Ident</span>, <span class="va">merged</span><span class="op">$</span><span class="va">Treatment</span><span class="op">)</span></span></code></pre></div>
 <p>You don’t have to know the sample names in advance –
 <code>per_sample_outs/</code> does. Load first, read
 <code>names(seurat_list)</code>, and write the sheet against what is
@@ -248,12 +155,11 @@ explicit.</p>
 <p>A <code>Sample</code> column is the primary key because it survives a
 CSV round trip. Rownames work too, and are used whenever there is no
 <code>Sample</code> column:</p>
-<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">sheet</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>Treatment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Bleomycin"</span>, <span class="st">"Bleomycin"</span><span class="op">)</span><span class="op">)</span></span>
-<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">sheet</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span>, <span class="st">"Sample_C"</span><span class="op">)</span></span>
+<div class="sourceCode" id="cb7"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="va">sheet</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span>Treatment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Bleomycin"</span><span class="op">)</span><span class="op">)</span></span>
+<span><span class="fu"><a href="https://rdrr.io/r/base/colnames.html" class="external-link">rownames</a></span><span class="op">(</span><span class="va">sheet</span><span class="op">)</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span><span class="op">)</span></span>
 <span></span>
-<span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sheet</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 1 metadata column to 3 objects: <span style="color: #0000BB;">"Treatment"</span></span></span></code></pre></div>
+<span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sheet</span><span class="op">)</span></span></code></pre></div>
 <p>If both are present the column wins. A data frame with neither – so,
 default <code>1, 2, 3</code> rownames – is rejected rather than matched
 positionally, because lining rows up by position against a list whose
@@ -268,7 +174,7 @@ experiment.</p>
 once present, is populated for <strong>all</strong> samples. A sample
 with no row is an error. So is an <code>NA</code>, an empty cell, or a
 whitespace-only cell:</p>
-<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb8"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">sheet</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
 <span>  Sample    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span>, <span class="st">"Sample_C"</span><span class="op">)</span>,</span>
 <span>  Treatment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="cn">NA</span>, <span class="st">"Bleomycin"</span><span class="op">)</span>,</span>
@@ -276,11 +182,11 @@ whitespace-only cell:</p>
 <span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">sheet</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;"> in `includeMetadata()`:</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> Every column of `metadata` must be populated for every sample.</span></span>
-<span><span class="co">#&gt; <span style="color: #BB0000;">✖</span> <span style="color: #00BB00;">Treatment</span>: missing for <span style="color: #0000BB;">"Sample_B"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BB0000;">✖</span> <span style="color: #00BB00;">Timepoint</span>: missing for <span style="color: #0000BB;">"Sample_A"</span> and <span style="color: #0000BB;">"Sample_C"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> A column left blank for some samples becomes `NA` for their cells after</span></span>
+<span><span class="co">#&gt; Error:</span></span>
+<span><span class="co">#&gt; Every column of `metadata` must be populated for every sample.</span></span>
+<span><span class="co">#&gt; ✖ Treatment: missing for "Sample_B"</span></span>
+<span><span class="co">#&gt; ✖ Timepoint: missing for "Sample_A" and "Sample_C"</span></span>
+<span><span class="co">#&gt; ℹ A column left blank for some samples becomes `NA` for their cells after</span></span>
 <span><span class="co">#&gt;   `mergeSeurat()`.</span></span></code></pre></div>
 <p>Every offending column is reported at once, so a forty-sample sheet
 gets fixed in one pass rather than forty.</p>
@@ -288,7 +194,7 @@ gets fixed in one pass rather than forty.</p>
 <code>Seurat::merge()</code> will happily combine an object carrying a
 <code>Treatment</code> column with one that doesn’t – it fills the gap
 with <code>NA</code> and says nothing:</p>
-<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb9"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">annotated</span>   <span class="op">&lt;-</span> <span class="va">seurat_list</span><span class="op">$</span><span class="va">Sample_A</span></span>
 <span><span class="va">unannotated</span> <span class="op">&lt;-</span> <span class="va">seurat_list</span><span class="op">$</span><span class="va">Sample_B</span></span>
 <span><span class="va">annotated</span><span class="op">$</span><span class="va">Treatment</span> <span class="op">&lt;-</span> <span class="st">"Control"</span></span>
@@ -296,9 +202,8 @@ with <code>NA</code> and says nothing:</p>
 <span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/merge.html" class="external-link">merge</a></span><span class="op">(</span><span class="va">annotated</span>, <span class="va">unannotated</span>, add.cell.id <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span><span class="op">)</span><span class="op">)</span></span>
 <span></span>
 <span><span class="fu"><a href="https://rdrr.io/r/base/table.html" class="external-link">table</a></span><span class="op">(</span><span class="va">merged</span><span class="op">$</span><span class="va">Treatment</span>, useNA <span class="op">=</span> <span class="st">"ifany"</span><span class="op">)</span></span>
-<span><span class="co">#&gt; </span></span>
-<span><span class="co">#&gt; Control    &lt;NA&gt; </span></span>
-<span><span class="co">#&gt;     356     341</span></span></code></pre></div>
+<span><span class="co">#&gt; Control    &lt;NA&gt;</span></span>
+<span><span class="co">#&gt;    4821    5104</span></span></code></pre></div>
 <p>Those <code>NA</code> cells then quietly drop out of every grouped
 comparison downstream. By the time you notice a group is short, the
 cause is several steps back. Requiring completeness up front makes the
@@ -309,17 +214,11 @@ state unreachable.</p>
 </h2>
 <p>Rows that match no loaded object are ignored with a warning, so one
 sheet can describe a whole experiment while you work on a subset:</p>
-<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="co"># the sheet describes five samples; only three are loaded</span></span>
-<span><span class="va">master_sheet</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/data.frame.html" class="external-link">data.frame</a></span><span class="op">(</span></span>
-<span>  Sample    <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Sample_A"</span>, <span class="st">"Sample_B"</span>, <span class="st">"Sample_C"</span>, <span class="st">"Sample_D"</span>, <span class="st">"Sample_E"</span><span class="op">)</span>,</span>
-<span>  Treatment <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Bleomycin"</span>, <span class="st">"Bleomycin"</span>, <span class="st">"Control"</span>, <span class="st">"Bleomycin"</span><span class="op">)</span></span>
-<span><span class="op">)</span></span>
-<span></span>
+<div class="sourceCode" id="cb10"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="co"># sheet covers all 40 samples; only Pool1's 4 are loaded</span></span>
 <span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">seurat_list</span>, <span class="va">master_sheet</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: Ignoring 2 rows of `metadata` matching no object in `objList`: <span style="color: #0000BB;">"Sample_D"</span> and</span></span>
-<span><span class="co">#&gt; <span style="color: #0000BB;">"Sample_E"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 1 metadata column to 3 objects: <span style="color: #0000BB;">"Treatment"</span></span></span></code></pre></div>
+<span><span class="co">#&gt; ! Ignoring 36 rows of `metadata` matching no object in `objList`: ...</span></span>
+<span><span class="co">#&gt; ✔ Added 2 metadata columns to 4 objects: "Treatment" and "Timepoint"</span></span></code></pre></div>
 <p>A typo is still caught, because a mistyped name in the sheet leaves
 some object without a row – and that is a hard error, not a warning.</p>
 </div>
@@ -328,21 +227,8 @@ some object without a row – and that is a hard error, not a warning.</p>
 </h2>
 <p><strong>Existing columns are protected.</strong> Re-running against
 an edited sheet errors unless you opt in:</p>
-<div class="sourceCode" id="cb13"><pre class="downlit sourceCode r">
-<code class="sourceCode R"><span><span class="va">corrected_sheet</span> <span class="op">&lt;-</span> <span class="va">master_sheet</span></span>
-<span><span class="va">corrected_sheet</span><span class="op">$</span><span class="va">Treatment</span><span class="op">[</span><span class="fl">2</span><span class="op">]</span> <span class="op">&lt;-</span> <span class="st">"Control"</span></span>
-<span></span>
-<span><span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">annotated</span>, <span class="va">corrected_sheet</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: Ignoring 2 rows of `metadata` matching no object in `objList`: <span style="color: #0000BB;">"Sample_D"</span> and</span></span>
-<span><span class="co">#&gt; <span style="color: #0000BB;">"Sample_E"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00; font-weight: bold;">Error</span><span style="font-weight: bold;"> in `includeMetadata()`:</span></span></span>
-<span><span class="co">#&gt; <span style="color: #BBBB00;">!</span> 1 column in `metadata` is already present in `objList`: <span style="color: #0000BB;">"Treatment"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Set `overwrite = TRUE` to replace them.</span></span>
-<span></span>
-<span><span class="va">annotated</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">annotated</span>, <span class="va">corrected_sheet</span>, overwrite <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span>
-<span><span class="co">#&gt; Warning: Ignoring 2 rows of `metadata` matching no object in `objList`: <span style="color: #0000BB;">"Sample_D"</span> and</span></span>
-<span><span class="co">#&gt; <span style="color: #0000BB;">"Sample_E"</span></span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Added 1 metadata column to 3 objects: <span style="color: #0000BB;">"Treatment"</span></span></span></code></pre></div>
+<div class="sourceCode" id="cb11"><pre class="downlit sourceCode r">
+<code class="sourceCode R"><span><span class="fu"><a href="../reference/includeMetadata.html">includeMetadata</a></span><span class="op">(</span><span class="va">annotated</span>, <span class="va">corrected_sheet</span>, overwrite <span class="op">=</span> <span class="cn">TRUE</span><span class="op">)</span></span></code></pre></div>
 <p><code>Ident</code> is reserved and cannot be set at all, even with
 <code>overwrite = TRUE</code> – it identifies the sample of origin and
 is what <code><a href="../reference/mergeSeurat.html">mergeSeurat()</a></code> verifies after merging.</p>
@@ -363,14 +249,8 @@ per-sample subsets stay comparable.</p>
 <p>That survives on the list but <strong>not</strong> through a merge:
 <code>Seurat::merge()</code> flattens factors to character. If you want
 an ordered factor on the merged object, re-apply it afterwards:</p>
-<div class="sourceCode" id="cb14"><pre class="downlit sourceCode r">
+<div class="sourceCode" id="cb12"><pre class="downlit sourceCode r">
 <code class="sourceCode R"><span><span class="va">merged</span> <span class="op">&lt;-</span> <span class="fu"><a href="../reference/mergeSeurat.html">mergeSeurat</a></span><span class="op">(</span><span class="va">annotated</span><span class="op">)</span></span>
-<span><span class="co">#&gt; <span style="color: #00BBBB;">ℹ</span> Merging 3 seurat objects...</span></span>
-<span><span class="co">#&gt; <span style="color: #00BB00;">✔</span> Successfully merged 3 seurat objects.</span></span>
-<span><span class="co">#&gt; An object of class Seurat </span></span>
-<span><span class="co">#&gt; 2092 features across 1011 samples within 1 assay </span></span>
-<span><span class="co">#&gt; Active assay: RNA (2092 features, 0 variable features)</span></span>
-<span><span class="co">#&gt;  1 layer present: counts</span></span>
 <span><span class="va">merged</span><span class="op">$</span><span class="va">Treatment</span> <span class="op">&lt;-</span> <span class="fu"><a href="https://rdrr.io/r/base/factor.html" class="external-link">factor</a></span><span class="op">(</span><span class="va">merged</span><span class="op">$</span><span class="va">Treatment</span>, levels <span class="op">=</span> <span class="fu"><a href="https://rdrr.io/r/base/c.html" class="external-link">c</a></span><span class="op">(</span><span class="st">"Control"</span>, <span class="st">"Bleomycin"</span><span class="op">)</span><span class="op">)</span></span></code></pre></div>
 </div>
   </main><aside class="col-md-3"><nav id="toc" aria-label="Table of contents"><h2>On this page</h2>

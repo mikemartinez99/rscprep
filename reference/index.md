@@ -8,8 +8,6 @@
   : Flag Outlier Cells by Median Absolute Deviation
 - [`getOutlierSummary()`](https://mikemartinez99.github.io/rscprep/reference/getOutlierSummary.md)
   : Retrieve the Outlier Summary Table from an Object
-- [`heart1k`](https://mikemartinez99.github.io/rscprep/reference/heart1k.md)
-  : 1k mouse heart cells, as a Seurat object
 - [`includeMetadata()`](https://mikemartinez99.github.io/rscprep/reference/includeMetadata.md)
   : Attach Sample-Level Metadata to a List of Seurat Objects
 - [`mergeSeurat()`](https://mikemartinez99.github.io/rscprep/reference/mergeSeurat.md)
