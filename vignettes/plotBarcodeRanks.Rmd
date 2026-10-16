@@ -178,7 +178,7 @@ seurat_list <- seuratFrom10x(path = outs, multi = FALSE,
 
 data.frame(
   expected = vapply(ranks, function(x) x$n_above_inflection, numeric(1)),
-  called   = vapply(seurat_list, ncol, integer(1))
+  called   = vapply(seurat_list, ncol, numeric(1))
 )
 ```
 
